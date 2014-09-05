@@ -1,0 +1,467 @@
+GAE/Go ハンズオン
+build simple application with GAE/Go
+15:00 14 Jun 2014
+Tags: Go, GAE
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* アジェンダ
+
+- GAE/Go紹介
+- 開発環境構築
+- Hello World作ってみよう!
+- 簡単なTODOアプリを作ってみよう!
+
+* GAE/Go紹介
+
+* GAEとは
+
+.image ./gaego_handson/images/gae.png 155 200
+
+- Googleのインフラ上でアプリを作る仕組み(PAAS)
+- 負荷に応じて自動スケール
+- Python、Java、PHP、 *Go* をサポート
+
+* GAE機能
+
+- Datastore(KVS)
+- Memcache
+- Task Queue（非同期メッセージキュー）
+- Mail（メール送受信）
+- Search（全文検索）
+- URL Fetch
+- 他にもいろいろ
+
+* GAE/Goの特徴
+
+.image ./gaego_handson/images/gae_gopher.jpg
+
+* 速い！
+特にspin-upが。
+
+.image ./gaego_handson/images/gae_spinups.png 270 450
+
+もちろん実行速度も。
+
+* Built-in Concurrency！
+
+.image ./gaego_handson/images/concurrent_gophers.jpg 194 400
+.image ./gaego_handson/images/concurrent_gophers.jpg 194 400
+
+平行処理をシンプルに書ける→パフォーマンスチューニングが容易
+つまり課金が抑えられる！！
+
+* 開発環境構築
+
+* Goのインストール
+
+不要！
+Google App Engine SDKにGoの環境が含まれている。
+
+* Google App Engine SDK for Goのインストール
+
+.link https://developers.google.com/appengine/downloads?hl=ja
+.image ./gaego_handson/images/download_sdk.png
+
+自分のPlatform用SDKをダウンロードして任意の場所に展開して下さい。
+
+* 環境設定
+
+環境変数を設定。
+
+*Mac/Linux*
+
+  $export GAEGO=<SDKをインストールしたパス>
+  $export GOROOT=$GAEGO/goroot
+  $export PATH=$GAEGO:$PATH
+
+*Windows（未確認）*
+
+  >set GAEGO=<SDKをインストールしたパス>
+  >set GOROOT=%GAEGO%\goroot
+  >set PATH=%GAEGO%;%PATH%
+
+毎回設定するのが面倒なら.bash_profileに記述するなり環境変数に設定するなり・・・ご自由に。
+
+FYI:
+
+.link https://bitbucket.org/ymotongpoo/goenv
+
+* Hello World作ってみよう!
+
+* ファイル構成
+
+  helloworld/
+  | hello/
+  | | hello.go
+  | app.yaml
+
+cheat:
+
+.link https://github.com/hogedigo/shizgo/tree/001helloworld/gaego-handson
+
+* hello.go
+
+.code ./gaego_handson/src/helloworld/hello/hello.go
+
+* app.yaml
+
+.code ./gaego_handson/src/helloworld/app.yaml
+
+* ローカルで実行
+
+  $goapp serve
+
+ブラウザでアクセス下記アドレスにアクセス。
+
+.link http://localhost:8080
+
+↓が表示されればOK!
+
+  Hello, world!
+
+* 動的コンパイル
+
+開発サーバーを起動したままhello.goを修正。
+修正したらブラウザを更新。
+
+.code ./gaego_handson/src/helloworld/hello/hello2.go / start OMIT/,/ end OMIT/
+
+サーバーの再起動なしで修正が反映される！！
+コンパイルが高速なのでまるでインタプリタ言語の様に開発出来る(^_^)
+
+* 開発サーバー管理コンソール
+
+.link http://localhost:8000/
+
+.image ./gaego_handson/images/dev_admin_console.png 500 930
+
+* 開発サーバーの終了
+
+  Ctrl+C
+
+* Production環境にデプロイしてみよう！
+
+* GAEアプリケーションの作成
+
+https://appengine.google.com/start
+
+Googleアカウントでログイン。
+
+.image ./gaego_handson/images/gae_createapp.png 200 600
+
+「Create Application」をクリック。
+
+* GAEアプリケーションの作成
+
+.image ./gaego_handson/images/gae_createapp2.png 550 510
+
+* 管理コンソール
+
+旧(GAE Admin Console)
+
+.link https://appengine.google.com/
+
+新(Google Developer Console)
+
+.link https://console.developers.google.com/project
+
+もともとGAE単体だったサービスがGoogle Cloud Platformへ統合された。
+今後は新コンソールに統一されていく流れだと思うが、まだ旧画面にしかないメニューもたくさん。
+
+* デプロイ
+
+  $goapp deploy
+
+googleアカウントのID/passwordを入力
+
+* 確認
+
+  http://your-app-id.appspot.com/
+
+.image ./gaego_handson/images/gopher_plane.jpg
+
+* 簡単なTODOアプリを作ってみよう！
+
+* 仕様
+
+- ユーザー認証
+- TODOの登録
+- TODOのリスト表示
+- TODOの完了
+- JSON API
+
+* 
+
+.image ./gaego_handson/images/todo_app.png 414 384
+
+* ユーザー認証
+
+GAEではGoogleアカウントによる認証を簡単に組み込むことが出来る。
+
+FYI:
+
+.link https://developers.google.com/appengine/docs/go/users/
+
+* ファイル構成
+
+  helloworld/
+  | hello/
+  | | hello.go
+  | todo/
+  | | todo.go - ## new!
+  | app.yaml
+
+cheat:
+
+.link https://github.com/hogedigo/shizgo/tree/002googleauth/gaego-handson/helloworld
+
+* todo.go
+
+.code ./gaego_handson/src/helloworld/todo/todo.go / start 1 OMIT/,/ end 1 OMIT/
+
+* todo.go
+
+.code ./gaego_handson/src/helloworld/todo/todo.go / start 2 OMIT/,/ end 2 OMIT/
+
+* 開発サーバーで動作確認
+
+  $goapp serve
+
+.link http://localhost:8080/todo
+
+開発サーバーではダミー認証画面が表示される。
+
+.image ./gaego_handson/images/gae_devauth.png 201 346
+
+ログインするとTODOトップ画面へ遷移。
+
+* Production環境で動作確認
+
+  $goapp deploy
+  
+  http://your-app-id.appspot.com/
+
+.image ./gaego_handson/images/gopher_plane.jpg
+
+* TODOの登録
+
+htmlのformから入力したTODOをGAE Datastoreに保存。
+
+* ファイル構成
+
+  helloworld/
+  | hello/
+  | | hello.go
+  | todo/
+  | | todo.go     - ## modify
+  | | todo.tmpl   - ## new!
+  | | register.go - ## new!
+  | app.yaml
+
+cheat:
+
+.link https://github.com/hogedigo/shizgo/tree/003register/gaego-handson/helloworld
+
+* html/template
+
+stringで記述していたhtmlをhtml/templateパッケージで書き換え。
+
+FYI:
+
+.link http://golang.org/pkg/html/template/
+.link http://goo.gl/9AwwFL
+
+* todo.go
+
+.code ./gaego_handson/src/helloworld/todo/todo2.go / start 1 OMIT/,/ end 1 OMIT/
+
+* todo.go
+
+.code ./gaego_handson/src/helloworld/todo/todo2.go / start 2 OMIT/,/ end 2 OMIT/
+
+* todo.tmpl
+
+.code ./gaego_handson/src/helloworld/todo/todo.tmpl
+
+* TODO登録処理
+
+フォームから入力されたTODOをDatastoreに保存。
+
+FYI:
+.link http://golang.org/pkg/net/http/#Request.ParseForm
+.link http://golang.org/pkg/net/http/#Request.FormValue
+.link https://developers.google.com/appengine/docs/go/datastore/
+.link https://developers.google.com/appengine/docs/go/datastore/reference?hl=ja#NewIncompleteKey
+.link https://developers.google.com/appengine/docs/go/datastore/reference?hl=ja#Put
+
+* register.go
+
+.code ./gaego_handson/src/helloworld/todo/register.go /start 1 OMIT/,/end 1 OMIT/
+
+* register.go
+
+.code ./gaego_handson/src/helloworld/todo/register.go /start 2 OMIT/,/end 2 OMIT/
+
+* register.go
+
+.code ./gaego_handson/src/helloworld/todo/register.go /start 3 OMIT/,/end 3 OMIT/
+
+* register.go
+
+.code ./gaego_handson/src/helloworld/todo/register.go /start 4 OMIT/,/end 4 OMIT/
+
+
+* TODOのリスト表示
+
+保存されたTODOをリスト表示する。
+Datastoreのクエリ機能を使用。
+
+FYI:
+
+.link https://developers.google.com/appengine/docs/go/datastore/reference?hl=ja#NewQuery
+.link https://developers.google.com/appengine/docs/go/datastore/reference?hl=ja#Query.GetAll
+
+* ファイル構成
+
+  helloworld/
+  | hello/
+  | | hello.go
+  | todo/
+  | | todo.go     - ## modify
+  | | todo.tmpl   - ## modiry
+  | | register.go
+  | app.yaml
+  | inded.yaml    - ## to be generated
+
+cheat:
+
+.link https://github.com/hogedigo/shizgo/tree/004todolist/gaego-handson/helloworld
+
+* todo.go
+
+.code ./gaego_handson/src/helloworld/todo/todo3.go /start 1 OMIT/,/end 1 OMIT/
+
+
+* todo.go
+
+.code ./gaego_handson/src/helloworld/todo/todo3.go /start 2 OMIT/,/end 2 OMIT/
+
+* todo.tmpl
+
+.code ./gaego_handson/src/helloworld/todo/todo2.tmpl /table/,/table/
+
+* index.yaml
+
+.code ./gaego_handson/src/helloworld/index.yaml
+
+クエリ実行に必要なインデックス定義ファイル。
+開発サーバーでクエリを実行すると自動生成される。
+
+* Datastoreクエリの罠
+
+- インデックスが必要。インデックス作成にもお金がかかる。
+- クエリ結果にDatastoreの更新が即時反映されない。
+
+回避策
+
+- クエリを使わない。Collection Property等を使う
+- Ancestor Query
+
+詳細は割愛します。詳しく知りたい方は直接聞いて下さいm(_ _)m
+
+* TODOの完了
+
+TODOを完了してリストから除外する。
+
+* ファイル構成
+
+  helloworld/
+  | hello/
+  | | hello.go
+  | todo/
+  | | done.go     - ## New!!
+  | | todo.go     - ## modify
+  | | todo.tmpl   - ## modiry
+  | | register.go
+  | app.yaml
+  | inded.yaml
+
+cheat:
+
+.link https://github.com/hogedigo/shizgo/tree/005done/gaego-handson/helloworld
+
+* todo.go
+
+.code ./gaego_handson/src/helloworld/todo/todo4.go /start 1 OMIT/,/end 1 OMIT/
+
+戻り値にkeyを受け取る。
+keyは更新時のパラメータとして使用する。
+
+* todo.go
+
+.code ./gaego_handson/src/helloworld/todo/todo4.go /start 2 OMIT/,/end 2 OMIT/
+
+* todo.tmpl
+
+.code ./gaego_handson/src/helloworld/todo/todo3.tmpl /table/,/table/
+
+* done.go
+
+.code ./gaego_handson/src/helloworld/todo/done.go /start 1 OMIT/,/end 1 OMIT/
+
+* JSON API
+
+JSONでtodoリストを取得するAPIを作成する。
+
+*仕様*
+- URLはTODO一覧取得と同じ http://your-host/todo
+- Acceptヘッダが「application/json」だった場合にJSONを返す
+
+FYI:
+
+.link http://golang.org/pkg/encoding/json/#Marshal
+.link http://golang.org/pkg/encoding/json/#MarshalIndent
+.link http://qiita.com/hogedigo/items/f914992baf7a2ed12b9c
+
+* ファイル構成
+
+  helloworld/
+  | hello/
+  | | hello.go
+  | todo/
+  | | done.go
+  | | todo.go     - ## modify
+  | | todo.tmpl
+  | | register.go
+  | app.yaml
+  | inded.yaml
+
+cheat:
+
+.link https://github.com/hogedigo/shizgo/tree/006jsonrest/gaego-handson/helloworld
+
+* todo.go
+
+.code ./gaego_handson/src/helloworld/todo/todo5.go /start 1 OMIT/,/end 1 OMIT/
+
+* todo.go
+
+.code ./gaego_handson/src/helloworld/todo/todo5.go /start 2 OMIT/,/end 2 OMIT/
+
+* 確認
+
+Postmanなどのツールで確認してみよう。
+
+.link https://chrome.google.com/webstore/detail/postman-rest-client/fdmmgilgnpjigdojojpjoooidkmcomcm
+
+* 最後に
+
+FYI:
+
+.link http://knightso.hateblo.jp/archive/category/golang
+
+.image ./gaego_handson/images/letitgo.png 310 440
+

@@ -1,0 +1,6 @@
+application: knightso-589
+
+dispatch:
+ - url: "goslides.knightso.co.jp/*"
+   module: goslides
+

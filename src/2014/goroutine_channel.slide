@@ -1,0 +1,306 @@
+GoroutineとChannel
+Go言語でConcurrencyプログラミング
+6 Sep 2014
+Tags: Go, GAE
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* アジェンダ
+
+- Goroutine
+- Channel
+- プログラミングパターン
+
+* Goroutine
+
+* Goroutineとは
+
+Go言語でConcurrencyを実現する仕組み
+
+.image ./goroutine_channel/images/concurrent_gophers.jpg 194 400
+.image ./goroutine_channel/images/concurrent_gophers.jpg 194 400
+
+Concurrencyとは・・・複数のタスクを同時に処理すること
+
+* Goroutineの特徴
+
+- スレッドみたいなもの? ※厳密には異なる
+- main関数もGoroutineとして呼び出されている
+- 他言語のスレッドと比較してとっても軽量
+- 使い方がとてもカンタン。関数呼び出しにgo付けるだけ
+- 但しちゃんとしたConcurrencyなプログラムを書くにはテクニックが必要
+
+
+* とにかく使ってみよう
+
+関数呼び出しの前に「go」つけるだけ！カンタン！
+
+.play ./goroutine_channel/src/goroutine/basic.go
+
+goつける前と後で結果を比べてみましょう。
+
+* あれ？
+
+結果が[no output]になりましたね？
+
+これは、関数hogeがGoroutineとして呼び出され呼び出し元（main関数）に制御が戻っているからです。
+
+main関数はfmt.Printlnの実行前に終了してしまっている為、プログラムが全体が終了しています。
+
+* それならば・・・
+
+Goroutine実行後少しsleepしてみましょう。
+
+.play ./goroutine_channel/src/goroutine/basic2.go
+
+"hoge!"が出力されましたね！＼(^o^)／
+
+1マイクロ秒待っている間に関数hoge（Goroutine）が実行されました！
+
+* 実は・・・
+
+GoはデフォルトでCPUを一つしか使わない設定の為、その設定のままでは並列処理が行われているわけではありません。同時に動いているGoroutineは一つだけで、その他は待機しています。
+各GoroutineはsleepやIO待ちが合った場合に他Goroutineに制御がスイッチします。
+
+runtime.GOMAXPROCS関数で使用するCPU数を指定出来ます。その場合、Goroutineはその数だけ並列に実行可能となります。
+
+.code ./goroutine_channel/src/goroutine/maxprocs.go / start 1/,/ end 1/
+
+runtime.NumCPU関数でその環境で使用可能なCPU数が取得出来るのでそれを指定してもよいでしょう。
+
+.code ./goroutine_channel/src/goroutine/maxprocs.go / start 2/,/ end 2/
+
+残念ながら本スライドやGo PlaygroundはGoogle App Engine上で動いている為、NumCPUは１になっており、並列処理を試すことは出来ません(´･ω･`)
+
+* Goroutineと匿名関数
+
+Goroutineは匿名関数に対しても呼び出すことが出来ます。
+
+.play ./goroutine_channel/src/goroutine/anonyfunc.go
+
+* Goroutineとメソッド
+
+Goroutineはメソッドに対しても呼び出すことが出来ます。
+
+.play ./goroutine_channel/src/goroutine/method.go / start 1/,/ end 1/
+
+但しこれは発表者個人の考えですが、あまり推奨しません。
+後述しますが、複数Goroutineから共通のリソースにアクセスするには細心の注意を払う必要があります。
+そもそもメソッドはレシーバ（メソッドの持ち主）のリソースにアクセスする使い方が多いため、気軽に使ってしまうと知らずにrace conditionを生み出す可能性が高いと思っています。
+
+* Goroutineとクロージャ
+
+Goroutineはクロージャに対しても呼び出すことが出来ます。
+
+.play ./goroutine_channel/src/goroutine/closure.go / start 1/,/ end 1/
+
+これも推奨しません。理由はメソッドとほぼ同じです。
+クロージャは通常レキシカルスコープの変数を参照・更新する用途で使用される為、そのままGoroutineで実行してしまうとほぼ問題が起きます。
+※上記コード例にも深刻な問題があります。考えてみて下さい。
+
+* Goroutineの落とし穴
+
+Goroutineと言うよりは、マルチスレッドプログラミング全般に言えることですが・・・
+
+複数のGoroutineから同じリソースにアクセスした場合、競合する可能性があります。
+
+.image ./goroutine_channel/images/conflict.png 400 560
+
+* 例えば・・・
+
+銀行口座に預金する処理を考えてみます。
+
+.play ./goroutine_channel/src/goroutine/bank.go / start 1/,/ end 1/
+
+実行すると期待する結果が見られると思います。
+これは使用CPU数が1の為各goroutineがアトミックに動作している為です。
+newbalanceの算出と、balanceの更新の行の間にsleepを入れてみましょう。
+預金したはずの残高が記録されてませんね・・・(´･ω･`)
+
+* 問題を解決する為には
+
+共有リソースに対する処理を複数Goroutineが同時に行えない様に排他処理（ロック）を組み込みます。
+ここではsyncパッケージのMutexを使用します。
+
+.play ./goroutine_channel/src/goroutine/banksync.go / start 1/,/ end 1/
+
+期待する結果がでましたね！＼(^o^)／
+
+* おまけ
+
+今迄main関数が先に終了しない様にSleep入れていましたが、これイケてないですよね？
+
+.code ./goroutine_channel/src/goroutine/banksync.go / start 2/,/ end 2/
+
+Goroutineがもし高速で終了していたら余計なSleepをしてしまいますし、もしGoroutine処理が予想よりも時間がかかってしまったら結局同じ問題が起きてしまいます(´･ω･`)
+
+* そんな貴方にWaitGroup!
+
+syncパッケージのWaitGroupを使うと、複数Goroutineの終了を待つことができます。
+
+.play ./goroutine_channel/src/goroutine/waitgroup.go / start 1/,/ end 1/
+
+* Channel
+
+* Channelとは
+
+Go言語にはシンプルにConcurrencyなプログラムを行う為のしくみが組み込みで用意されています。
+
+それがChannelです！
+
+.image ./goroutine_channel/images/gopher_chanel.gif 400 320 
+
+* Channelとは
+
+- 複数のGoroutine間でメッセージをやり取りする為のツール
+- SynchronizedなQueue（またはパイプ）の様なもの
+- やりとりするデータの型を指定できる
+- バッファ(容量)を指定できる※デフォルトは0
+- 送信時にバッファに空きがなく、受信待ちのGoroutineがいないと処理がブロックされる
+- 受信時にバッファが空で、かつ送信待ちのGoroutineがいないと処理がブロックされる
+
+* とにかく使ってみよう
+
+ChannelはSliceやMapと同様参照型で、make()関数で生成できます。
+
+.play ./goroutine_channel/src/channel/basic.go / start 1/,/ end 1/
+
+SleepやWaitGroupを使わなくてもmain関数が先に終了していないのは、channelの受信がデータを受け取るまでブロックされているからです。
+
+* バッファ付きチャネル
+
+make関数の第２引数でバッファサイズを指定出来ます。
+バッファサイズがフルになるまでは送信がブロックされません。
+
+.play ./goroutine_channel/src/channel/buffered.go / start 1/,/ end 1/
+
+バッファサイズを変更して結果を見てみましょう。
+
+* close
+
+close関数でchannelを閉じます。
+閉じたchannelには送信出来ません。パニクります。
+受信は、値がすでに入っていれば閉じたchannelに対しても可能です。空の閉じたchannelに対して受信を行った場合は値は0値になり、第２戻り値(bool)にfalseが返ります。これをチェックすることでGoroutineの終了を監視することもできます。
+
+* close
+
+.play ./goroutine_channel/src/channel/close.go / start 1/,/ end 1/
+
+* rangeでイテレート
+
+ChannelはSliceやMapの様にrange文でイテレートすることが出来ます。
+受信されるまでブロックし、受信されたらそのデータを受け取ります。
+Channelがcloseされたらループが終了します。
+
+.play ./goroutine_channel/src/channel/range.go / start 1/,/ end 1/
+
+* 受信専用channel、送信専用channel
+
+Channel型には受信専用、送信専用を明示することが出来ます。
+これにより関数の引数や戻り値などで間違った使われ方を防ぐことができます。
+デフォルトの送受信用Channelは、受信専用、送信専用にキャスト出来ます。逆は出来ません。
+
+* 受信専用channel、送信専用channel
+
+.play ./goroutine_channel/src/channel/sendrecv.go / start 1/,/ end 1/
+
+* デッドロック
+
+送信可能なgoroutineのいない空のchannelから受信を行おうとするとデッドロックでパニクります。
+
+.play ./goroutine_channel/src/channel/deadlock.go / start 1/,/ end 1/
+
+* デッドロック
+
+受信可能なgoroutineのいないバッファに空きのないchannelに送信を行おうとしてもデッドロックでパニクります。
+
+.play ./goroutine_channel/src/channel/deadlock2.go / start 1/,/ end 1/
+
+バッファに空きがある場合はデッドロックになりません。
+
+* select文
+
+select〜case文を使用すると、複数channelを同時に監視することが出来ます。
+
+.play ./goroutine_channel/src/channel/select.go / start 1/,/ end 1/
+
+* select文
+
+受信だけでなく送信もcaseに記述することが出来ます。
+
+.play ./goroutine_channel/src/channel/select2.go / start 1/,/ end 1/
+
+* select文 - default
+
+select文にもswitchと同様defaultが指定出来ます。
+defaultが無い場合いずれかのcaseのchannel送受信が行われるまでブロックされますが、defaultがあると全てのChannel送受信がなかった場合にブロックされずにdefaultが実行されます。
+
+* select文 - default
+
+.play ./goroutine_channel/src/channel/selectdefault.go / start 1/,/ end 1/
+Channelの送受信を行いたいが、出来ない場合にブロックされたくない場合にも使用出来ます。
+
+* プログラミングパターン
+
+* for-select loop
+
+.code ./goroutine_channel/src/patterns/forselect.go / start 1/,/ end 1/
+
+Goroutineで無限forループを回してselect文+Channelで外部とやり取りします。
+デーモンやサーバーなどの常駐プログラム作る際に便利です。
+goroutineのローカル変数で状態を管理出来るので、とてもシンプルにConcurrentなプログラムを書く事が出来ます。
+
+
+* for-select loop
+
+.play ./goroutine_channel/src/patterns/forselect.go / start 2/,/ end 2/
+
+上記サンプルは無限ループなのでkillして終了させて下さい。
+
+* Request/Response
+
+発表者はchan chanパターンとも呼んでいます(^^;
+
+channel経由でメッセージを送る際に、そのメッセージに対する結果を受け取りたいことがあります。
+そのchannelは双方向ではないのでレスポンス用のchannelを用意する必要がありますが、複数Goroutineが共有するchannelだと自分のメッセージに対するレスポンスを特定するのが面倒です。
+そんなときにこのパターンが使用出来ます。
+
+リクエスト用Channelにレスポンス用Channelを送信します。リクエストを受け取った側は結果をレスポンス用Channelに送信します。そうすることで送信者が結果を受け取ることができます。
+
+* Request/Response
+
+.code ./goroutine_channel/src/patterns/reqres.go / start 1/,/ end 1/
+mainループに対してChannel経由で停止要求を送ります。
+このサンプルでは停止処理失敗のエラーをレスポンスで返しています。
+
+* Request/Response
+
+.play ./goroutine_channel/src/patterns/reqres.go / start 2/,/ end 2/
+
+* Future
+
+非同期で起動した処理(Goroutine)の結果を、後で必要な時に参照するパターンです。
+参照時にまだ結果が得られていない場合はブロックされます。
+Go言語ではChannelがそのままFutureの役割をします。
+
+.play ./goroutine_channel/src/patterns/future.go / start 1/,/ end 1/
+
+* Coroutine/Generator
+
+Concurrencyとは直接関係ないですが、GoroutineとChannelを使用する事で他言語にあるCoroutineやGeneratorと同等の機能を実現することが出来ます。
+
+.play ./goroutine_channel/src/patterns/generator.go / start 1/,/ end 1/
+サンプルはシーケンスを生成するGeneratorです。
+
+* 最後に
+
+FYI:
+
+.link http://gihyo.jp/magazine/wdpress/archive/2014/vol82
+.link http://jxck.hatenablog.com/entry/20130414/1365960707
+.link http://www.slideshare.net/takuyaueda967/goroutinechannelgogolang2
+
+.image ./goroutine_channel/images/letitgo.png 310 440
+

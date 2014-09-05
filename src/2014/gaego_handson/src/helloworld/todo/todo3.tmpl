@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html><body>
+Hello, {{.User.Email}} ! - <a href="{{.LogoutUrl}}">sign out</a><br>
+<hr>
+<form action="/todo/register" method="POST">
+todo:<input name="Todo" type="text"></input><br>
+note:<textarea name="Notes" type="text"></textarea><br>
+dueDate:<input name="DueDate" type="date"></input><br>
+<input type="submit"></input>
+</form>
+<hr>
+<table border="1">
+<thead>
+	<tr>
+		<th>Todo</th>
+		<th>Notes</th>
+		<th>DueDate</th>
+		<th></th> // HL
+	</tr>
+</thead>
+<tbody>
+{{$keys := .Keys}} // HL
+{{range $index, $element := .Todos}} // HL
+	<tr>
+		<td>{{.Todo}}</td>
+		<td style="white-space: pre;">{{.Notes}}</td>
+		<td>{{.DueDate}}</td>
+		<td><a href="/todo/done?key={{(index $keys $index).Encode}}">done</a></td> // HL
+	</tr>
+{{end}}
+</tbody>
+</table><br>
+<a href="/todo">refresh</a>
+</body></html>
