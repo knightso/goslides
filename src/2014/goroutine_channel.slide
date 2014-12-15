@@ -13,6 +13,10 @@ Knightso, LLC
 - Channel
 - プログラミングパターン
 
+本スライドで使用するサンプルコード
+
+.link https://github.com/knightso/goslides/tree/master/src/2014/goroutine_channel/src
+
 * Goroutine
 
 * Goroutineとは

@@ -1,0 +1,33 @@
+" ============================================================================
+" Netrw Directory Listing                                        (netrw v149)
+"   /Users/daigoikeda/github/goslides/src/2014/gaego_handson/src/helloworld/todo
+"   Sorted by      name
+"   Sort sequence: [\/]$,\<core\%(\.\d\+\)\=\>,\.h$,\.c$,\.cpp$,\~\=\*$,*,\.o$,\.obj$,\.info$,\.swp$,\.bak$,\~$
+"   Hiding:        CVS,\(^\|\s\s\)\zs\.\S\+
+"   Quick Help: <F1>:help  -:go up dir  D:delete  R:rename  s:sort-by  x:exec
+" ============================================================================
+../
+2014/
+| gaego_handson/
+| | images/
+| | src/
+| | | helloworld/
+| | | | hello/
+| | | | todo/
+| | | | | done.go
+| | | | | register.go
+| | | | | todo.go
+| | | | | todo.tmpl
+| | | | | todo2.go
+| | | | | todo2.tmpl
+| | | | | todo3.go
+| | | | | todo3.tmpl
+| | | | | todo4.go
+| | | | | todo5.go
+| | | | app.yaml*
+| | | | index.yaml
+| gaego_introduction/
+| goroutine_channel/
+| gaego_handson.slide
+| gaego_introduction.slide
+| goroutine_channel.slide
