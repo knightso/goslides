@@ -1,0 +1,6 @@
+queue:
+- name: pushtest
+  rate: 50/s
+
+- name: pulltest
+  mode: pull
