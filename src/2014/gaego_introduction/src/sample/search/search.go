@@ -2,73 +2,86 @@ package search
 
 import (
 	"appengine"
-	"appengine/delay"
-	"appengine/taskqueue"
-	"bytes"
+	"appengine/search"
 	"encoding/json"
 	"fmt"
 	"net/http"
-	"strconv"
 	"time"
 )
 
 func init() {
-	http.HandleFunc("/search/saveIndx", saveIndex)
-	http.HandleFunc("/search/search", search)
+	http.HandleFunc("/search/save", saveIndex)
+	http.HandleFunc("/search/search", searchBooks)
 }
 
 type Book struct {
 	Title     string
 	Author    string
-	Price     int
+	Price     float64
 	CreatedAt time.Time
 }
 
-func saveIndx(w http.ResponseWriter, r *http.Request) {
+func saveIndex(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
-	index, err := Search.Open("Book")
+	index, err := search.Open("Book")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
-	book := &Book{
+	books := make([]*Book, 0, 3)
+	books = append(books, &Book{
 		Title:     "Perfect Go",
 		Author:    "Some Gopher",
 		Price:     3000,
 		CreatedAt: time.Now(),
-	}
+	})
+	books = append(books, &Book{
+		Title:     "Go In Practice",
+		Author:    "One Gopher",
+		Price:     2500,
+		CreatedAt: time.Now(),
+	})
+	books = append(books, &Book{
+		Title:     "Let it go",
+		Author:    "hogehoge",
+		Price:     3000,
+		CreatedAt: time.Now(),
+	})
 
-	_, err := index.Put(c, "book1", book)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
+	for i, book := range books {
+		_, err := index.Put(c, fmt.Sprintf("book%d", i), book)
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
 
 	fmt.Fprint(w, "success")
 }
 
-func search(w http.ResponseWriter, r *http.Request) {
+func searchBooks(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
-	index, err := Search.Open("Book")
+	index, err := search.Open("Book")
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	books := make([]*Book, 0, 10)
-	t := index.Search(c, "Gopher", nil)
+	t := index.Search(c, "Gopher Price >= 3000", nil)
 	for {
 		var book Book
-		id, err := t.Next(&doc)
+		_, err := t.Next(&book)
 		if err == search.Done {
 			break
 		} else if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+		books = append(books, &book)
 	}
 
 	je := json.NewEncoder(w)
@@ -77,4 +90,3 @@ func search(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 }
-
