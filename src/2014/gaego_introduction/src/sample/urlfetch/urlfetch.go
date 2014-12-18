@@ -16,8 +16,9 @@ func init() {
 func fetch(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
-	client := urlfetch.Client(c)
-	resp, err := client.Get("http://www.google.com/")
+	// start urlfetch OMIT
+	client := urlfetch.Client(c)                      // HL
+	resp, err := client.Get("http://www.google.com/") // HL
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -28,6 +29,7 @@ func fetch(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	// end urlfetch OMIT
 
 	c.Debugf("%s", buf.String())
 

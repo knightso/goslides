@@ -24,12 +24,6 @@ type Book struct {
 func saveIndex(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
-	index, err := search.Open("Book")
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
 	books := make([]*Book, 0, 3)
 	books = append(books, &Book{
 		Title:     "Perfect Go",
@@ -50,13 +44,21 @@ func saveIndex(w http.ResponseWriter, r *http.Request) {
 		CreatedAt: time.Now(),
 	})
 
+	// start searchput OMIT
+	index, err := search.Open("Book") // HL
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	for i, book := range books {
-		_, err := index.Put(c, fmt.Sprintf("book%d", i), book)
+		_, err := index.Put(c, fmt.Sprintf("book%d", i), book) // HL
 		if err != nil {
 			http.Error(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
 	}
+	// end searchput OMIT
 
 	fmt.Fprint(w, "success")
 }
@@ -64,14 +66,15 @@ func saveIndex(w http.ResponseWriter, r *http.Request) {
 func searchBooks(w http.ResponseWriter, r *http.Request) {
 	c := appengine.NewContext(r)
 
-	index, err := search.Open("Book")
+	// start search OMIT
+	index, err := search.Open("Book") // HL
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	books := make([]*Book, 0, 10)
-	t := index.Search(c, "Gopher Price >= 3000", nil)
+	t := index.Search(c, "Gopher Price >= 3000", nil) // HL
 	for {
 		var book Book
 		_, err := t.Next(&book)
@@ -83,6 +86,7 @@ func searchBooks(w http.ResponseWriter, r *http.Request) {
 		}
 		books = append(books, &book)
 	}
+	// end search OMIT
 
 	je := json.NewEncoder(w)
 	if err := je.Encode(books); err != nil {
