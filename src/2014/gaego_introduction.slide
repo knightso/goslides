@@ -251,7 +251,7 @@ cron.yaml
    schedule: every 24 hours
    target: beta
 
-- 決められたタイミングでURLを実行
+- 決められたタイミングでリクエストハンドラを実行
 
 * その他の機能
 
@@ -262,6 +262,7 @@ cron.yaml
 - XMPP
 - Modules
 - Managed VMs
+- Google Cloud Storage連携
 
 * 最後に
 
