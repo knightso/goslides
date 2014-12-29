@@ -67,12 +67,10 @@ body {
 
   border: 1px solid rgba(0, 0, 0, .3);
 
-  /*
   transition: transform .3s ease-out;
   -o-transition: -o-transform .3s ease-out;
   -moz-transition: -moz-transform .3s ease-out;
   -webkit-transition: -webkit-transform .3s ease-out;
-  */
 }
 .slides.layout-widescreen > article {
   margin-left: -550px;
@@ -338,8 +336,8 @@ code {
 }
 
 article > .image {
-  	text-align: center;
-    margin-top: 40px;
+  text-align: center;
+  margin-top: 40px;
 }
 
 table {
@@ -419,13 +417,13 @@ div.output .buttons {
 
 /* Presenter details */
 .presenter {
-	margin-top: 20px;
+  margin-top: 20px;
 }
 .presenter p,
 .presenter .link {
-	margin: 0;
-	font-size: 28px;
-	line-height: 1.2em;
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2em;
 }
 
 /* Output resize details */
@@ -452,4 +450,12 @@ div.output .buttons {
   height: 9px;
   left: -5px;
   top: -5px;
+}
+iframe {
+  border: none;
+}
+figcaption {
+  color: #666;
+  text-align: center;
+  font-size: 0.75em;
 }

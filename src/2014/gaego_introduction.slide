@@ -90,7 +90,7 @@ Knightso, LLC
 - 条件検索にはインデックスが必要
 - 単一プロパティのインデックスは自動で作成される（課金対象なので注意！）
 - 複数プロパティに対する検索には複合インデックスを明示的に作成する必要あり（次ページ）
-- インデックスの更新には遅延がある為条件と結果が一致しないことがある（Ancestorクエリは保証される）
+- インデックスの更新には遅延がある為条件と結果が一致しないことがある（Ancestorクエリは例外）
 
 * Datastore - 複合インデックス設定
 
@@ -262,11 +262,18 @@ cron.yaml
 - XMPP
 - Modules
 - Managed VMs
-- Google Cloud Storage連携
+- 他GCPサービスとの連携（GCS, BigQuery, CloudSQL, etc）
+- edge cache
 
 * 最後に
 
 FYI:
+
+GAE/Goハンズオン
+
+.link http://goslides.knightso.co.jp/2014/gaego_handson.slide#1
+
+弊社開発ブログ
 
 .link http://knightso.hateblo.jp/archive/category/golang
 
