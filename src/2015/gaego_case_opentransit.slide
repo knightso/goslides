@@ -1,0 +1,119 @@
+GAE/Go 事例紹介その１
+Opentrans.it
+15:00 28 Feb 2015
+Tags: Go, GAE
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* アジェンダ
+
+- Opentrans.it紹介
+- 実装
+
+* Opentrans.it紹介
+
+* Opentrans.itとは
+
+- オープンデータの実証実験基盤
+- バスの時刻表データを配信(GTFS)
+- バスの現在位置や乗客数をリアルタイム配信(GTFS Realtime)
+
+詳細は別資料参照
+
+* 実装
+
+* モデル設計
+
+GTFSデータはDatastore(KVS)に保存する。
+GTFS各fileをモデルに落とす。
+
+- Agency
+- Route
+- Trip
+- Stop
+- StopTime
+- Calendar
+- CalendarDate
+- Shape
+
+* モデル設計
+
+ER図
+
+* エンティティグループ
+
+- Datastoreはエンティティグループ(EG)単位でトランザクションを設定出来る
+- EGはエンティティの親子孫関係
+- 1トランザクションに含められるEG数は25。（最近5から増えた！）
+- 何でもかんでもEGに入れるとロックコンテンションでしぬ
+- 更新頻度の低いリソース系データのみEG設定するとよい
+- 結果整合で十分ならタスクキューを使う
+
+* エンティティグループ
+
+絵
+
+* アーキテクチャ
+
+- バックエンド   : GAE/Go
+- フロントエンド : AngularJS
+- REST APIベースのアーキテクチャ
+
+TODO picture?
+
+今回はGAE/Goのハナシなのでバックエンドを中心に紹介。。
+
+* Martini
+
+Classy web development in Go
+http://martini.codegangsta.io/
+https://github.com/go-martini/martini
+
+* GAE & Martini
+
+GAEもMartiniもnet/http準拠なので親和性が高い
+
+TODO
+
+* Martini - ミドルウェア
+
+TODO
+
+* Martini - URLルーティング
+
+TODO
+
+* Martini - Dependency Injection
+
+TODO
+
+* GTFS配信
+
+GTFSは複数のcsvファイルをzipでまとめたもの
+- encoding/csv
+- zip
+
+* GTFS配信 - データのロード
+
+- ツリー構造のデータモデルを順に取得する必要がある
+- goroutine&channelを使用して高速化
+
+* GTFSリアルタイム配信
+
+- protocol buffers
+- goprotobuf
+- JSONも提供
+- edge cache
+
+* バス停検索
+
+- Search APIを使用
+- GeoPoint
+
+* ログの保存
+
+Task Queue + modules + bigquery
+
+
