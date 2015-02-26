@@ -1,5 +1,6 @@
-GAE/Go 事例紹介その１
-Opentrans.it
+GAE/Go 事例紹介
+公共オープンデータバス配信基盤 Opentrans.it
+
 15:00 28 Feb 2015
 Tags: Go, GAE
 
@@ -27,7 +28,7 @@ Knightso, LLC
 * モデル設計
 
 GTFSデータはDatastore(KVS)に保存する。
-GTFS各fileをモデルに落とす。
+GTFSの各fileをモデル(Kind)に落とす。
 
 - Agency
 - Route
@@ -38,30 +39,32 @@ GTFS各fileをモデルに落とす。
 - CalendarDate
 - Shape
 
-* モデル設計
+* モデル設計 - ER図
 
-ER図
+.image ./gaego_case_opentransit/images/er.png 334 800
 
-* エンティティグループ
+* エンティティ設計
 
-- Datastoreはエンティティグループ(EG)単位でトランザクションを設定出来る
-- EGはエンティティの親子孫関係
-- 1トランザクションに含められるEG数は25。（最近5から増えた！）
+- 正規化しすぎるとパフォーマンスが劣化する
+- コレクションプロパティも有効
+- エンティティグループ設計大事
+- エンティティグループ(EG)とはエンティティの親子孫関係。一番祖先のエンティティ（親がいない）と頂点とするツリー構造。
+- DatastoreはEG単位でトランザクション(Tx)を設定出来る
+- クロスグループトランザクション(XGTx)を使うと1Txに25EGまで含められる（つい最近まで上限5EGだった）
 - 何でもかんでもEGに入れるとロックコンテンションでしぬ
-- 更新頻度の低いリソース系データのみEG設定するとよい
+- 更新頻度の低いエンティティのみEG設定すると良し
 - 結果整合で十分ならタスクキューを使う
 
-* エンティティグループ
+* エンティティグループ図
 
-絵
+.image ./gaego_case_opentransit/images/eg.png
 
 * アーキテクチャ
 
-- バックエンド   : GAE/Go
-- フロントエンド : AngularJS
+- バックエンド - GAE/Go
+- フロントエンド - AngularJS
+- バス端末アプリ - ionic
 - REST APIベースのアーキテクチャ
-
-TODO picture?
 
 今回はGAE/Goのハナシなのでバックエンドを中心に紹介。。
 
@@ -95,9 +98,9 @@ GTFSは複数のcsvファイルをzipでまとめたもの
 - encoding/csv
 - zip
 
-* GTFS配信 - データのロード
+* GTFS配信 - データロード
 
-- ツリー構造のデータモデルを順に取得する必要がある
+- ツリー構造のデータモデルを順に辿って取得する必要がある
 - goroutine&channelを使用して高速化
 
 * GTFSリアルタイム配信
