@@ -17,11 +17,17 @@ Knightso, LLC
 
 * Opentrans.itとは
 
+.image ./gaego_case_opentransit/images/screenshot.png 529 800
+
+* Opentrans.itとは
+
+.link http://opentrans.it/
+
 - オープンデータの実証実験基盤
 - バスの時刻表データを配信(GTFS)
-- バスの現在位置や乗客数をリアルタイム配信(GTFS Realtime)
-
-詳細は別資料参照
+.link https://developers.google.com/transit/gtfs/?hl=ja
+- バスの現在位置や乗客数をリアルタイム配信(GTFSリアルタイム)
+.link https://developers.google.com/transit/gtfs-realtime/?hl=ja
 
 * 実装
 
@@ -66,13 +72,20 @@ GTFSの各fileをモデル(Kind)に落とす。
 - バス端末アプリ - ionic
 - REST APIベースのアーキテクチャ
 
-今回はGAE/Goのハナシなのでバックエンドを中心に紹介。。
+今回はGAE/Goのハナシなのでバックエンドのみ紹介。。
 
 * Martini
 
 Classy web development in Go
-http://martini.codegangsta.io/
-https://github.com/go-martini/martini
+
+.link https://github.com/go-martini/martini
+
+リフレクションバリバリで重いので最近嫌われている？
+
+他には・・・
+
+.link https://github.com/codegangsta/negroni Negroni
+.link https://github.com/zenazn/goji Goji
 
 * GAE & Martini
 
