@@ -1,6 +1,6 @@
 application: knightso-589
 module: goslides
-version: 4
+version: 5
 runtime: go
 api_version: go1
 
