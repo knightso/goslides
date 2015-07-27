@@ -1,0 +1,200 @@
+GAE/Go Managed VMsハンズオン
+
+15:00 26 Jul 2015
+Tags: Go, GAE
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* Managed VMs(MVMs)とは
+
+* Managed VMs(MVMs)とは
+
+ざっくり言うと・・・
+GAEアプリケーションをGCEインスタンス上で動作させることが出来る！
+
+.image ./hello_mvms/images/vmhosting.png
+
+* 何がうれしいの？
+
+- GAEでは禁止されていたことが何でも出来る!
+- もちろんGAEのサービスも使える
+- サーバースペックを自由に調整可能
+- coreたくさん使える←コレ重要！
+- Custom Runtimes（Nodejs, Dart, Ruby, Nginx）
+
+* 現状の課題
+
+- 開発環境がまだまだこなれていない
+- デプロイするとGCEインスタンスが最低一つ立ち上がりっぱなしになるので削除し忘れて課金されっぱなしになるので注意
+- GAEのインスタンス無料枠使えない
+- spin-up遅い(らしい)
+
+* MVMsハンズオン
+
+* MVMsハンズオン
+
+GAE/Go MVMsアプリを作って実行&デプロイしてみよう！
+
+注：MVMsは現時点（Jul/2015）でまだbetaの為、本スライドに書かれている手順はすぐ古くなる可能性が高い。
+
+* 事前準備
+
+* GCPプロジェクト作成
+
+MVMsを試す為にはGCPプロジェクトと課金設定(クレジットカード登録)が必要。
+
+.link https://cloud.google.com/appengine/docs/managed-vms/getting-started#create_a_project_and_enable_billing
+
+初めての登録ならば$300分のお試しクレジットが適用される。
+プロジェクト作成したくない場合は、本日限定で貸し出します^^
+
+* Dockerインストール
+
+.link https://cloud.google.com/appengine/docs/managed-vms/getting-started#install_docker
+
+上記URLにも書いてあるが現時点でMVMsはDocker1.7.1未対応とのことなので、1.7.0をインストールすること。
+
+boot2dockerインストール後に下記作業:
+
+  $ boot2docker download --iso-url=https://github.com/boot2docker/boot2docker/releases/download/v1.7.0/boot2docker.iso
+  $ boot2docker stop
+  $ boot2docker delete
+  $ boot2docker init
+  $ boot2docker up
+
+* Google Cloud SDKインストール
+
+ダウンロード
+
+.link https://cloud.google.com/sdk/
+
+設定
+
+.link https://cloud.google.com/appengine/docs/managed-vms/getting-started#install_the_google_cloud_sdk
+
+* Google App Engine SDKインストール
+
+最新のCloud SDKからGAE/Goコンポーネントが削除された為、GAE/Goの単体SDKをインストールする。
+
+.link https://cloud.google.com/appengine/downloads
+
+* Cloud SDKをハック
+
+現在Cloud SDKのデグレードで、GAE/Go MVMsのローカル実行が出来なくなっている。
+
+.link https://code.google.com/p/google-cloud-sdk/issues/detail?id=164
+
+あまり推奨はされないが、SDKのコードを直接修正して対処する。
+
+.link google-cloud-sdk/platform/google_appengine/google/appengine/tools/devappserver2/go_application.py
+
+36行目の
+
+ _SDKROOT = os.path.dirname(os.path.dirname(google.__file__))
+
+を
+
+ _SDKROOT = '<your GAE/Go SDK install directory>'
+
+に変更
+
+* 実装
+
+* hellomvms.go
+
+ package main
+
+ import (
+ 	"html/template"
+ 	"net/http"
+ 	"runtime"
+ 	"time"
+
+ 	"google.golang.org/appengine"
+ 	"google.golang.org/appengine/log"
+ )
+
+ var initTime = time.Now()
+
+ func init() {
+ 	http.HandleFunc("/", handle)
+ 	appengine.Main()
+ }
+
+ func main() {
+ }
+
+* hellomvms.go(2)
+
+ func handle(w http.ResponseWriter, r *http.Request) {
+ 	if r.URL.Path != "/" {
+ 		http.NotFound(w, r)
+ 		return
+ 	}
+
+ 	ctx := appengine.NewContext(r)
+ 	log.Infof(ctx, "Serving the front page.")
+
+ 	param := struct {
+ 		RunningTime time.Duration
+ 		NumCPU      int
+ 	}{
+ 		time.Since(initTime),
+ 		runtime.NumCPU(),
+ 	}
+
+ 	tmpl.Execute(w, param)
+ }
+
+* hellomvms.go(3)
+
+ var tmpl = template.Must(template.New("front").Parse(`
+ <html><body>
+
+ <p>
+ Hello, MVMs!
+ </p>
+
+ <p>
+ This instance has been running for <em>{{.RunningTime}}</em>.
+ </p>
+
+ <p>
+ Num of CPU is <em>{{.NumCPU}}</em>.
+ </p>
+
+ </body></html>
+ `))
+
+* app.yaml
+
+.code ./hello_mvms/src/hellomvms/app.yaml
+
+* ローカル実行
+
+プロジェクトIDを設定
+
+ $ gcloud config set project <project ID>
+
+実行
+
+ $ gcloud preview app run app.yaml
+
+http://localhost:8080/ で動作確認。
+
+* デプロイ!
+
+本来はgcloudでデプロイ出来るはずだが、現在不具合で実行出来ない為appcfg.pyで行う。
+
+ $ appcfg.py update -A metal-bus-589 -V mvms2015072601 --oauth2 .
+
+Developers ConsoleのApp Engine - Versionsにデプロイされているかを確認。
+
+http://<version>.<project>.appspot.com/　で動作確認。
+
+デプロイしたバージョンは課金され続けるので注意！！不要なら都度削除すること。
+
+
+
