@@ -138,8 +138,7 @@ index.yaml
 * 
 
  if noParams {
- 	log.Infof(ctx, "Query ALL")
- 	q = q.Filter("Indexes =", createIndex("", QUERY_ALL_INDEX))
+ 	q = q.Filter("Indexes =", createIndex("", "ALL"))
  }
  
  q = q.Order("-PublishDate").Order("Price").Order("Category")
