@@ -1,0 +1,238 @@
+Datastoreで検索エンジンを作る
+
+19:00 08 Jun 2016
+Tags: GAE, Go
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* Profile
+
+Daigo Ikeda
+@hogedigo
+
+Knightso, LLC
+http://www.knightso.co.jp/
+Shizuoka, JAPAN
+
+.image ./dssearch/images/hogecat.jpg 
+
+* Datastoreだけで検索エンジン作りたい!
+
+* How
+
+- 全文照合 or 索引 → 索引!
+- インデックス作成方法
+
+N-gram(Bigram)
+ 
+ AppEngine → ap, pp, pe, en, ng, gi, in, ne
+
+Prefix
+
+ AppEngine → a, ap, app, appe, appen, appeng, appengi, appengin, appengine
+
+形態素解析
+ 
+ 貴社の記者が汽車で帰社した → 貴社, の, 記者, が, 汽車, で, 帰社, した
+
+併用
+
+* Why not Search API?
+
+.link https://cloud.google.com/appengine/docs/go/search/
+
+ // search for documents with pianos that cost less than $5000
+ index.Search(ctx, "Product = piano AND Price < 5000", nil)
+
+- たしかに便利
+- インデックスサイズに制限あり → スケールしない(´･ω･`)
+
+* Why not BigQuery?
+
+- レイテンシー
+- コスト
+
+* Why not Elasticsearch or something like that?
+
+まぁ、appengine ja nightだし・・
+
+* Datastoreだけで実装してみる
+
+* Entity Model
+
+ type Book struct {
+ 	ID          string `datastore:",noindex"`
+ 	Title       string `datastore:",noindex"`
+ 	Category    string `datastore:",noindex"`
+ 	Price       int    `datastore:",noindex"`
+ 	PublishDate string `datastore:",noindex"`
+ }
+
+* Index Model
+
+インデックス保存用のエンティティを用意する
+
+ type BookIndex struct {
+ 	Title       string
+ 	Category    string
+ 	Price       int
+ 	PublishDate string
+ 	Indexes     []string
+ }
+
+Bookと同じKey名で保存しておく
+
+ソートに必要なプロパティも必要
+Indexesプロパティに解析したインデックスを保存
+
+* Custom Index
+
+eg) ORDER BY PublishDate DESC, Price, Category
+
+index.yaml
+
+ - kind: BookIndex
+   properties:
+   - name: Indexes
+   - name: PublishDate
+     direction: desc
+   - name: Price
+   - name: Category
+
+- ソートのパターンだけ必要
+- ソート必要なければカスタムインデックス不要
+
+* Save Indexes
+
+.image ./dssearch/images/makeindex.png 450 _
+
+- 可能な限りEquality Filterで可能な様に
+
+* Search!
+
+ q := datastore.NewQuery(KindBookIndex).Limit(QUERY_LIMIT + 1).KeysOnly()
+ 
+ if req.Title != "" {
+ 	for _, w := range bigram(req.Title, " ") {
+ 		q = q.Filter("Indexes =", "t " + w)
+ 	}
+ }
+ 
+ if req.Category != "" {
+ 	q = q.Filter("Indexes =", "c " + req.Category)
+ }
+ 
+ if req.Price != "" {
+ 	q = q.Filter("Indexes =", "p " + req.Price)
+ }
+
+ // 最初のソートに指定したプロパティにはInequality Filterを使える! 
+ if req.PublishDateFrom != "" {
+ 	q = q.Filter("PublishDate >=", req.PublishDateFrom)
+ }
+ 
+* 
+
+ if noParams {
+ 	log.Infof(ctx, "Query ALL")
+ 	q = q.Filter("Indexes =", createIndex("", QUERY_ALL_INDEX))
+ }
+ 
+ q = q.Order("-PublishDate").Order("Price").Order("Category")
+ 
+ keys := make([]*datastore.Key, 0, QUERY_LIMIT)
+ 
+ ite := q.Run(ctx)
+ 
+ for len(keys) < QUERY_LIMIT {
+ 	idxKey, err := ite.Next(nil)
+ 	if err == datastore.Done {
+ 		break
+ 	}
+
+ 	...snip...
+ 
+ 	key := datastore.NewKey(ctx, KindBook, idxKey.StringID(), 0, nil)
+ 	keys = append(keys, key)
+ }
+
+* On-Memory Filter
+
+Inequality Filterは最初のソート対象プロパティに対してしか適用できない。
+それ以上のことをする場合はプログラムでフィルターかけるしかない
+
+
+ //KeysOnlyは外す
+ for len(keys) < QUERY_LIMIT {
+ 	var book Book
+ 	idxKey, err := ite.Next(&book)
+ 
+ 	...snip...
+ 
+ 	if book.Price < priceFrom || book.Price >= priceTo {
+ 		continue
+ 	}
+ 
+ 	books = append(books, book)
+ }
+
+- 最後の手段
+- オンメモリでやる場合も可能な限りEquality Filterで絞っておくとよい
+
+
+* Projection Query
+
+.link https://cloud.google.com/appengine/docs/go/datastore/projectionqueries
+
+ SELECT PublishDate, Price, Category FROM Book
+
+必要なプロパティのみ取得
+
+ q := datastore.NewQuery(KindBookIndex).
+ 	Project("PublishDate", "Price", "Category").
+ 	Limit(QUERY_LIMIT + 1)
+
+- 安い!＼(^o^)／
+
+* Pros
+
+- 早い
+- Full Managed
+
+* Cons
+
+- Entityのサイズ上限(1M)
+- LIKE検索→N-gram
+- OR検索
+- Inequality Filter
+- インデックス作成コスト
+
+* Single Propety Indexだけで実装したい！
+
+* Index Model
+
+ type BookIndex struct {
+ 	Indexes []string
+ }
+
+- Indexesのみ保存
+
+* Index Key
+
+eg) ORDER BY Price, PublishDate DESC, Category
+
+ <Price>:<PublishDate>:<Category>:<ID>
+
+- Priceは0埋め
+- Categoryは空白埋め
+- 降順ソート項目は反転させる必要あり
+
+* 
+
+.image ./dssearch/images/single-props.png 300 _ 
+
+- KeysOnly
+- ソートは勝手にかかる
+- ソートパターン毎にIndex Entityを保存する必要あり
