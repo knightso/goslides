@@ -1,6 +1,6 @@
 Datastoreで検索エンジンを作る
 
-19:00 08 Jun 2016
+08 Jun 2016
 Tags: GAE, Go
 
 Daigo Ikeda
@@ -48,7 +48,7 @@ Prefix
  index.Search(ctx, "Product = piano AND Price < 5000", nil)
 
 - たしかに便利
-- インデックスサイズに制限あり → スケールしない(´･ω･`)
+- インデックスサイズに制限(10GB) → スケールしない(´･ω･`)
 
 * Why not BigQuery?
 
@@ -59,7 +59,7 @@ Prefix
 
 まぁ、appengine ja nightだし・・
 
-* Datastoreだけで実装してみる
+* Datastoreだけで検索エンジン実装してみる
 
 * Entity Model
 
@@ -76,17 +76,17 @@ Prefix
 インデックス保存用のエンティティを用意する
 
  type BookIndex struct {
+ 	Indexes     []string
  	Title       string
  	Category    string
  	Price       int
  	PublishDate string
- 	Indexes     []string
  }
 
-Bookと同じKey名で保存しておく
+Bookと同じKey名で保存する(Kindが異なる)
 
-ソートに必要なプロパティも必要
 Indexesプロパティに解析したインデックスを保存
+ソートに必要なプロパティも保存
 
 * Custom Index
 
@@ -102,21 +102,22 @@ index.yaml
    - name: Price
    - name: Category
 
-- ソートのパターンだけ必要
+- ソートの組み合わせの数だけ定義が必要
 - ソート必要なければカスタムインデックス不要
 
 * Save Indexes
 
-.image ./dssearch/images/makeindex.png 450 _
+.image ./dssearch/images/makeindex.png 420 _
 
-- 可能な限りEquality Filterで可能な様に
+- 可能な限りEquality Filterが使える様にインデックスを作る
+- ALLインデックスが必要
 
 * Search!
 
  q := datastore.NewQuery(KindBookIndex).Limit(QUERY_LIMIT + 1).KeysOnly()
  
  if req.Title != "" {
- 	for _, w := range bigram(req.Title, " ") {
+ 	for _, w := range bigram(req.Title) {
  		q = q.Filter("Indexes =", "t " + w)
  	}
  }
@@ -159,13 +160,22 @@ index.yaml
  	keys = append(keys, key)
  }
 
+* 
+
+ books := make([]*Book, len(keys))
+ if len(books) > 0 {
+ 	if err := datastore.GetMulti(ctx, keys, books); err != nil {
+ 		return nil, fmt.Errorf("GetMulti failed: %s", err)
+ 	}
+ }
+
 * On-Memory Filter
 
-Inequality Filterは最初のソート対象プロパティに対してしか適用できない。
-それ以上のことをする場合はプログラムでフィルターかけるしかない
+Inequality Filterは最初のソート対象プロパティに対してしか適用できない
+他プロパティに対してフィルターかけたい場合はプログラムでやるしかない
 
 
- //KeysOnlyは外す
+ //KeysOnly外す
  for len(keys) < QUERY_LIMIT {
  	var book Book
  	idxKey, err := ite.Next(&book)
@@ -180,7 +190,7 @@ Inequality Filterは最初のソート対象プロパティに対してしか適
  }
 
 - 最後の手段
-- オンメモリでやる場合も可能な限りEquality Filterで絞っておくとよい
+- オンメモリでやる場合も可能な限りEquality Filterで絞りこんでおくとよい
 
 
 * Projection Query
@@ -197,17 +207,20 @@ Inequality Filterは最初のソート対象プロパティに対してしか適
 
 - 安い!＼(^o^)／
 
+* まとめ
+
 * Pros
 
-- 早い
+- 速い!
+- Scalable
 - Full Managed
 
 * Cons
 
 - Entityのサイズ上限(1M)
-- LIKE検索→N-gram
-- OR検索
-- Inequality Filter
+- LIKE検索できない→N-gram
+- OR(IN)検索できない
+- Inequality Filterは最初のソートプロパティにしか適用できない
 - インデックス作成コスト
 
 * Single Propety Indexだけで実装したい！
@@ -236,4 +249,6 @@ eg) ORDER BY Price, PublishDate DESC, Category
 
 - KeysOnly
 - ソートは勝手にかかる
+- Keyから値が取れる(like Projection Query)
+
 - ソートパターン毎にIndex Entityを保存する必要あり
