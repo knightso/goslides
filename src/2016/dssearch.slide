@@ -49,16 +49,7 @@ Prefix
 - たしかに便利
 - インデックスサイズに制限(10GB) → スケールしない(´･ω･`)
 
-* Why not BigQuery?
-
-- レイテンシー
-- コスト
-
-* Why not Elasticsearch or something like that?
-
-まぁ、appengine ja nightだし・・
-
-* Datastoreだけで検索エンジン実装してみる
+* 実装
 
 * Entity Model
 
@@ -109,7 +100,7 @@ index.yaml
 .image ./dssearch/images/makeindex.png 420 _
 
 - 可能な限りEquality Filterが使える様にインデックスを作る
-- ALLインデックスが必要
+- ALLインデックス(カスタムインデックス節約)
 
 * Search!
 
