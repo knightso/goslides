@@ -1,0 +1,20 @@
+#cloud-config
+
+users:
+- name: cloudservice
+  uid: 2000
+
+write_files:
+- path: /etc/systemd/system/cloudservice.service
+  permissions: 0644
+  owner: root
+  content: |
+    [Unit]
+    Description=Start a simple docker container
+
+    [Service]
+    ExecStart=docker run -t busybox:latest /bin/sleep 3600
+
+runcmd:
+- systemctl daemon-reload
+- systemctl start cloudservice.service
