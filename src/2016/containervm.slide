@@ -1,0 +1,318 @@
+Container VM ハンズオン
+
+23 Jul 2016
+Tags: GCP
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* Profile
+
+Daigo Ikeda
+@hogedigo
+ikeda@knightso.co.jp
+
+Knightso, LLC
+http://www.knightso.co.jp/
+Shizuoka, JAPAN
+
+.image ./containervm/images/hogecat.jpg 
+
+* コンテナとは?
+
+.image ./containervm/images/container.jpg 250 _
+
+- アプリケーションと依存環境を一つにまとめたもの
+- 異なる実行環境間の移動が容易。開発→本番、オンプレ→クラウド、etc
+
+* VM vs コンテナ
+
+.image ./containervm/images/vm-vs-docker-container.png 300 _
+
+- VMはそれぞれが独立したOSを持つ
+- コンテナはOSカーネルを共有する
+- コンテナの方が軽量
+
+* Container-VM Imageとは？
+
+.image ./containervm/images/docker-on-gce.png 300 _
+
+- Google Compute Engine上でDockerコンテナを動作させる為のVMイメージ
+- 大雑把に言うとDockerのインストールを省略できる
+- その他にも機能あり
+
+* Container-Optimized Google Compute Engine Images(Open Preview)
+
+.link https://cloud.google.com/compute/docs/containers/container_vms
+
+- OS: Debian 7
+- Docker
+- GCE metadata framework
+- Kubernetes Kubelet
+- 非推奨(´･ω･`) 次項のContainer-VM Image(beta)に移行
+
+* Container-VM Image(beta)
+
+.link https://cloud.google.com/compute/docs/containers/vm-image/
+
+- OS: Chrome OS
+- cloud-init
+- GCE metadata framework
+- Kubeletなくなった(´･ω･`)
+
+* vs Google Container Engine(GKE)
+
+.image ./containervm/images/gke.png 300 _
+
+- Container-VMはGKEにおけるNodeに相当
+- GKEの方がはるかに多機能
+- 大きなクラスタを組んでちゃんと管理・運用するのならGKE
+- 手軽にDocker試してみたいのならContainer-VM
+
+* ハンズオン
+
+* 目標
+
+- Goで超簡易WEBサーバーアプリを作成してデプロイする
+- Container-Optimized Images(Open Preview)
+- Container-VM Image(beta)
+
+* 事前準備
+
+* 
+
+- GCPプロジェクトの作成
+- 課金設定
+
+.link https://goo.gl/sAvkE4 FYI: Google福田さんのハンズオン資料
+
+* 
+
+Dockerのビルド環境を作成
+
+- ローカルDocker（&gcloud SDK）
+
+または
+
+- Google Cloud Shell
+
+.image ./containervm/images/cloudshell.png 150 _
+
+ローカル&gcloudの場合
+
+ $ gcloud auth login  
+ $ gcloud init
+
+プロジェクトやzoneを選択しておく
+
+* アプリケーション作成
+
+* app.go
+
+ package main
+ 
+ import (
+ 	"fmt"
+ 	"net/http"
+ )
+ 
+ func main() {
+ 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+ 		fmt.Fprintf(w, "Hello, Container VM!")
+ 	})
+ 	http.ListenAndServe(":8080", nil)
+ }
+
+* 
+
+テスト実行
+
+ $ go run app.go
+
+プレビュー(cloud shell)
+
+.image ./containervm/images/webpreview.png 150 _
+
+停止
+
+ Ctrl＋C
+
+* Dockerfile
+
+ FROM golang:1.6-onbuild
+ MAINTAINER Your Name
+
+.link https://hub.docker.com/_/golang/ FYI: Docker golang official image
+
+* Docker build
+
+ビルド
+
+ $ docker build -t testapp .
+
+テスト実行
+
+ $ docker run -p 8080:8080 testapp
+
+プレビュー(cloud shell)
+
+.image ./containervm/images/webpreview.png 150 _
+
+停止
+
+ Ctrl＋C
+
+* Push
+
+Container Registryにpushする
+
+ $ docker tag testapp us.gcr.io/gcpug-containervm/testapp
+ $ gcloud docker push us.gcr.io/gcpug-containervm/testapp
+
+[Container Engine] - [Container Registry]の画面でpushされているか確認する
+
+* Container-Optimized Images(Open Preview)
+
+* Containers.yaml
+
+ apiVersion: v1
+ kind: Pod
+ metadata:
+   name: testapp
+ spec:
+   containers:
+     - name: testapp
+       image: us.gcr.io/your-project-id/testapp
+       imagePullPolicy: Always
+       ports:
+         - containerPort: 8080
+           hostPort: 80
+
+* インスタンス作成
+
+現状container-vm imageは画面から選択出来ない為、gcloudコマンドで行う
+
+ $ gcloud compute instances create testapp --zone us-central1-b --image-family container-vm \
+ --image-project google-containers --machine-type n1-standard-1 --tags "http-server" \
+ --metadata-from-file google-container-manifest=containers.yaml
+
+ブラウザで確認
+
+.image ./containervm/images/checkbrowser.png 150 _
+
+* インスタンスグループをオートスケールさせてみる
+
+* インスタンステンプレート作成
+
+現状container-vm imageは画面から選択出来ない為、gcloudコマンドで行う
+
+※ preemptibleを指定
+
+ $ gcloud compute instance-templates create testapp-tmpl --image-family container-vm \
+ --image-project google-containers --machine-type n1-standard-1 --network "default" \
+ --maintenance-policy "TERMINATE" --preemptible --boot-disk-size "20" \
+ --boot-disk-type "pd-standard" --boot-disk-device-name "testapp" --tags "http-server" \
+ --metadata-from-file google-container-manifest=containers.yaml
+
+[Compute Engine] - [Instance templates]にtestapp-tmplというインスタンステンプレートが作成されているか確認
+
+* インスタンスグループ作成
+
+インスタンステンプレートtestapp-tmplを選択し、[CREATE INSTANCE GROUP]をクリック
+
+Autoscaling: On
+他項目: 任意
+
+[Create]で作成
+
+* ロードバランサ設定
+
+インスタンスグループに対してロードバランサを設定する
+
+ここでは割愛する m(_ _)m
+
+* Container-VM Image(beta)
+
+* 基本操作
+
+インスタンス作成
+
+ $ gcloud compute instances create testapp2 --zone us-central1-b \
+ --image-family gci-stable --image-project google-containers --machine-type n1-standard-1 \
+ --tags "http-server"
+
+ログイン
+
+ローカルから
+
+ $ gcloud compute ssh testapp2 --zone us-central1-b
+
+または
+
+.image ./containervm/images/ssh.png 100 _
+
+* ユーザーをDockerグループにする
+
+ $ sudo usermod -a -G docker ${USER}
+ $ exec sudo su ${USER}
+
+これをしないとログインユーザーからDocker daemonに接続出来ない。
+sudo dockerでもdockerは実行出来るが、現状private Container Registoryに接続出来ていない為ユーザーで操作する。
+
+* docker login
+
+Container Registryにdocker loginする。
+container-vmにスクリプトが用意されている。
+
+ $ /usr/share/google/dockercfg_update.sh
+
+rootで実行したい場合はsudoでdocker loginしておく必要があるが、container-vmでは/rootがread-onlyになっている様で失敗する
+現状解決方法不明(´･ω･`)
+
+* 実行
+
+ $ docker run -d -i -t -p 80:8080 --restart unless-stopped --name testapp2 \
+ us.gcr.io/gcpug-containervm/testapp
+
+ブラウザで表示されることを確認
+
+
+* 参考: 自動実行
+
+現状うまくいっていない(´･ω･`)
+
+user-data.yaml
+
+ #cloud-config
+ 
+ write_files:
+ - path: /etc/systemd/system/testapp.service
+   permissions: 0644
+   owner: root
+   content: |
+     [Unit]
+     Description=GCPUG Shonan container-vm test app
+ 
+     [Service]
+     ExecStart=docker run -d -i -t -p 80:8080 --restart unless-stopped --name testapp2 us.gcr.io/gcpug-containervm/testapp
+ 
+ runcmd:
+ - systemctl daemon-reload
+ - systemctl start testapp.service
+
+* 
+
+インスタンス作成
+
+metadata(key=user-data)に作成したyamlを指定
+
+ $ gcloud compute instances create testapp2 --zone us-central1-b \
+ --image-family gci-stable --image-project google-containers --machine-type n1-standard-1 \
+ --tags "http-server" --metadata-from-file user-data=user-data.yaml
+
+
+* 最後に
+
+お金がかかってしまうので、作成したインスタンス等削除しておきましょう。
+
