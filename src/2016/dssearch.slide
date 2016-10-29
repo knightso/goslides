@@ -1,6 +1,6 @@
 Datastoreで検索エンジンを作る
 
-08 Jun 2016
+29 Oct 2016
 Tags: GAE, Go
 
 Daigo Ikeda
@@ -18,7 +18,101 @@ Shizuoka, JAPAN
 
 .image ./dssearch/images/hogecat.jpg 
 
-* Datastoreだけで検索エンジン作りたい!
+
+* Datastore Indexおさらい
+
+* Sample: Book Store
+
+Model:
+
+ type Book struct {
+ 	ID          string
+ 	Title       string
+ 	Category    string
+ 	Price       int
+ 	PublishDate string
+ }
+
+* Sample: Book Store
+
+Run Query:
+
+ 	q := datastore.NewQuery("Book").Limit(20)
+ 	
+ 	// apply filters here
+ 	
+ 	var books []*Book
+ 	_, err := q.GetAll(ctx, &books)
+
+Equality Filter:
+
+ q = q.Filter("Category = ", "趣味")
+
+Inequality Filter:
+
+ q = q.Filter("Price >= ", 1000)
+
+Sort:
+
+ q = q.Order("Price")
+
+* Single Property Index
+
+- デフォルトで作成される。作成したくないPropertyフィールドにはnoindexタグを付与する
+
+ type Hoge struct {
+ 	Value string `datastore:",noindex"`
+ }
+
+- 1 Propertyのみに対するFilter・Sort
+- 複数Propetyに対するEquality FilterのみのQuery(Merge JOIN)
+- Indexのwrite operationコストは無料になったので基本つけておいた方が便利
+- Storageコストはかかる
+- 後からIndexを追加する場合は既存Entityを全てPutし直す必要あり
+
+* Composite Property Index
+
+index.yaml
+
+ indexes:
+ 
+ - kind: Book
+   properties:
+   - name: Category
+   - name: Price
+     direction: desc
+
+- 複数PropertyにまたがるFilter・Sort(Inequality FilterまたはSortが含まれる場合)
+- Inequality Filterは最初のSort項目にしか含めることが出来ない 
+- Composite Property Indexは設定すると自動で作成される
+- index.yamlから削除しても自動では削除されない(appcfg vacuum_indexが必要)
+
+* Index Example
+
+.image ./dssearch/images/indexes.png 500 _
+
+* List Property
+
+ type Hoge struct {
+ 	Values []string
+ }
+
+- 複数の値を保持できるプロパティ
+- Single Property Indexも作成される
+- Composite Propety Indexにも指定可能(但し...爆発に注意!)
+- Filterにマッチする要素が1件でもあればhitする(has条件)
+
+* List Property Index Example
+
+.image ./dssearch/images/list-indexes.png 500 _
+
+* ZigZag Merge JOIN
+
+.image ./dssearch/images/zigzag.png 300 _
+
+* Datastoreだけで検索エンジン作ろう!
+
+.image ./dssearch/images/computer_search_kensaku.png 350 _
 
 * How
 
@@ -48,6 +142,18 @@ Prefix
 
 - たしかに便利
 - インデックスサイズに制限(10GB) → スケールしない(´･ω･`)
+- hit件数が大きいとソートが正しく動かない
+
+* Why not BigQuery?
+
+- Latency
+- Cost
+
+* Why not Cloud SQL?
+
+- Availability
+- Scalability
+- Fault tolerance
 
 * 実装
 
@@ -78,7 +184,15 @@ Bookと同じKey名で保存する(Kindが異なる)
 Indexesプロパティに解析したインデックスを保存
 ソートに必要なプロパティも保存
 
-* Custom Index
+* Save Indexes
+
+.image ./dssearch/images/makeindex.png 400 _
+
+- 可能な限りEquality Filterが使える様にインデックスを作る
+- Prefixを付与しておく
+- 無条件検索の為にALLインデックスが必要
+
+* Composite Property Index
 
 eg) ORDER BY PublishDate DESC, Price, Category
 
@@ -94,13 +208,6 @@ index.yaml
 
 - ソートの組み合わせの数だけ定義が必要
 - ソート必要なければカスタムインデックス不要
-
-* Save Indexes
-
-.image ./dssearch/images/makeindex.png 420 _
-
-- 可能な限りEquality Filterが使える様にインデックスを作る
-- ALLインデックス(カスタムインデックス節約)
 
 * Search!
 
@@ -181,6 +288,16 @@ Inequality Filterは最初のソート対象プロパティに対してしか適
 - 最後の手段
 - オンメモリでやる場合も可能な限りEquality Filterで絞りこんでおくとよい
 
+* 独自複合インデックス
+
+Merge Joinにも弱点がある
+
+- 条件が増えるとパフォーマンスが落ちる
+- 条件間で重複が多く、かつhitしないとパフォーマンスが落ちる
+
+上記を解決する為に、よく使用される条件の組み合わせで予めインデックスを作成しておく。
+
+組み合わせ数によりインデックス量がかなり増加するのでバランス調整が重要。
 
 * Projection Query
 
@@ -208,7 +325,7 @@ Inequality Filterは最初のソート対象プロパティに対してしか適
 
 - Entityのサイズ上限(1M)
 - LIKE検索できない→N-gram
-- OR(IN)検索できない
+- OR(IN)検索できない→手動結果マージ
 - Inequality Filterは最初のソートプロパティにしか適用できない
 - インデックス作成コスト
 
