@@ -297,7 +297,7 @@ Merge Joinにも弱点がある
 
 上記を解決する為に、よく使用される条件の組み合わせで予めインデックスを作成しておく。
 
-組み合わせ数によりインデックス量がかなり増加するのでバランス調整が重要。
+.image ./dssearch/images/combination-index.png 300 _ 
 
 * Projection Query
 
