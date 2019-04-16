@@ -1,6 +1,6 @@
 go generate
 
-26 Aug 2019
+26 Aug 2017
 Tags: GAE, Go
 
 Daigo Ikeda
@@ -16,7 +16,7 @@ Knightso, LLC
 http://www.knightso.co.jp/
 Shizuoka, JAPAN
 
-.image ./dssearch/images/hogecat.jpg 
+.image ./images/hogecat.jpg 
 
 * go generate とは
 

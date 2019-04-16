@@ -1,0 +1,220 @@
+Goで静的解析!
+
+26 Mar 2019
+Tags: GAE, Go
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* Profile
+
+Daigo Ikeda
+@hogedigo
+
+Knightso, LLC
+http://www.knightso.co.jp/
+Shizuoka, JAPAN
+
+.image ./images/hogecat.jpg 
+
+* 静的解析とは
+
+- ソースコードを解析して情報を集めること
+- プログラムは実行しない
+
+* 用途
+
+- bugや無作法なコードの検出
+- メトリクス計測
+- コード補完
+- コード整形
+- 自動生成
+
+* 用例
+
+- gofmt ... 標準コード整形
+- goimports ... 標準コード整形 + import自動解決
+- go vet ... 潜在bugの検出
+- golint ... コーディングスタイルチェック
+- gocode ... コード補完
+- errcheck ... エラー処理チェック
+- stringer ... String()メソッド自動生成
+
+* 静的解析の流れ
+
+.image ./images/goanalysisflow2.png 530 _
+
+* goパッケージ
+
+.link https://golang.org/pkg/go/
+
+- ast ... 抽象構文木(AST)を表す型と、それを扱う関数を提供する
+- build ... パッケージ情報を収集する
+- constant ... 定数に関する型と、それを扱う関数を提供する
+- doc ... ASTからソースコードドキュメントを抽出する
+- format ... 標準コード整形機能を実装する
+- importer ... パッケージのimporterを提供する
+- parser ... ソースコードを解析してASTを構築する 
+- printer ... ASTノードの表示機能を提供する
+- scanner ... ソースコードに対して字句解析を行う
+- token ... トークンを表す定数と、それを扱う関数を提供する
+- types ... Goの型情報と、型チェック用アルゴリズムを提供する
+
+
+* golang.org/x/tools/goパッケージ
+
+.link https://godoc.org/golang.org/x/tools/go
+
+(抜粋)
+- analysis ... 静的解析モジュールとドライバ間のインターフェースを提供
+- ast ... AST関連ユーティリティ
+- packages ... パッケージ情報をロードする(Go Modulesに対応)
+- callgraph ... call graph関連のアルゴリズム&ユーティリティ
+- cfg ... control flow graph関連のアルゴリズム&ユーティリティ
+- ssa ... Static Single Assignment関連アルゴリズム&ユーティリティ
+- pointer ... ポインタ解析アルゴリズム&ユーティリティ
+- pointer ... ポインタ解析アルゴリズム&ユーティリティ
+- types ... 型情報関連ユーティリティ
+
+* やってみよう
+
+.code ./ast.go
+
+* analysisパッケージ
+
+.link https://godoc.org/golang.org/x/tools/go/analysis
+
+静的解析モジュールとドライバ間のインターフェースを提供
+
+* analysisパッケージ
+
+- 複数の静的解析ツールで共通の解析処理を共有できる
+- 構文解析、型チェックまで自動で行ってくれる
+- go1.12からはgo vetから呼び出せる。go vet内部からも利用
+
+* Analyzer
+
+ type Analyzer struct {
+ 	Name             string
+ 	Doc              string
+ 	Flags            flag.FlagSet
+ 	Run              func(*analysis.Pass) (interface{}, error)
+ 	RunDespiteErrors bool
+ 	Requires         []*analysis.Analyzer
+ 	ResultType       reflect.Type
+ 	FactTypes        []Fact
+ }
+
+- Run ... 解析関数
+- RunDespiteErrors ... 構文エラー、型エラーを検出しても実行する
+- Requires ... 依存する（事前実行しておく）Analyzer
+- ResultType ... 解析結果の型
+- FactTypes ... Factの型
+
+* Pass
+
+ type Pass struct {
+ 	Analyzer          *analysis.Analyzer
+ 	Fset              *token.FileSet
+ 	Files             []*ast.File
+ 	OtherFiles        []string
+ 	Pkg               *types.Package
+ 	TypesInfo         *types.Info
+ 	TypesSizes        types.Sizes
+ 	Report            func(analysis.Diagnostic)
+ 	ResultOf          map[*analysis.Analyzer]interface{}
+ 	ImportObjectFact  func(obj types.Object, fact analysis.Fact) bool
+ 	ImportPackageFact func(pkg *types.Package, fact analysis.Fact) bool
+ 	ExportObjectFact  func(obj types.Object, fact analysis.Fact)
+ 	ExportPackageFact func(fact analysis.Fact)
+ }
+
+診断結果出力
+
+ func (pass *Pass) Reportf(pos token.Pos, format string, args ...interface{})
+
+* singlechecker
+
+.link https://godoc.org/golang.org/x/tools/go/analysis/singlechecker
+
+ package main
+ 
+ import (
+ 	"example.org/findbadness"
+ 	"golang.org/x/tools/go/analysis/singlechecker"
+ )
+ 
+ func main() { singlechecker.Main(findbadness.Analyzer) }
+
+* multichecker
+
+.link https://godoc.org/golang.org/x/tools/go/analysis/multichecker
+
+ package main
+ 
+ import (
+ 	"golang.org/x/tools/go/analysis/multichecker"
+ 
+ 	// analysis plug-ins
+ 	"golang.org/x/tools/go/analysis/passes/asmdecl"
+ 	"golang.org/x/tools/go/analysis/passes/assign"
+ 	"golang.org/x/tools/go/analysis/passes/atomic"
+ )
+ 
+ func main() {
+ 	multichecker.Main(
+ 		asmdecl.Analyzer,
+ 		assign.Analyzer,
+ 		atomic.Analyzer,
+ 	)
+ }
+
+* unitchecker
+
+.link https://godoc.org/golang.org/x/tools/go/analysis/unitchecker
+
+ package main
+ 
+ import (
+ 	"golang.org/x/tools/go/analysis/unitchecker"
+ 
+ 	"golang.org/x/tools/go/analysis/passes/asmdecl"
+ 	"golang.org/x/tools/go/analysis/passes/assign"
+ 	"golang.org/x/tools/go/analysis/passes/atomic"
+ )
+ 
+ func main() {
+ 	unitchecker.Main(
+ 		asmdecl.Analyzer,
+ 		assign.Analyzer,
+ 		atomic.Analyzer,
+ 	)
+ }
+
+呼び出し
+
+ go vet -vettool=$(which myvet) pkgname
+
+
+* Example
+
+.link https://github.com/knightso/allcases allcases
+
+* 参考資料
+
+- GoのためのGo
+.link https://motemen.github.io/go-for-go-book/
+- Goにおける静的解析のモジュール化について
+.link https://tech.mercari.com/entry/2018/12/16/150000
+- Gopherを探せ！（静的解析ハンズオン）
+.link https://golangtokyo.github.io/codelab/find-gophers/?index=codelab#0
+
+* まとめ
+
+- 静的解析でコード品質をあげよう！
+- まずは既存の解析ツールから
+- 既存ツールに欲しいものが見つからなかったら自作！
+- 静的解析やるとGo文法にも詳しくなる＼(^o^)／
+
+Thank you!
