@@ -1,6 +1,6 @@
 module github.com/knightso/goslides
 
-go 1.12
+go 1.11
 
 require (
 	golang.org/x/sync v0.0.0-20190412183630-56d357773e84 // indirect
