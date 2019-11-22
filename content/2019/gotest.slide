@@ -30,7 +30,6 @@ Shizuoka, JAPAN
 - TestMain
 - テストヘルパー
 - アサーション
-- モック
 
 * 基本的なテスト
 
@@ -226,8 +225,6 @@ testing.T#Helperメソッドを呼んでおくと結果出力のファイル名�
 
 .code ./gotest/src/gotest/hello/hello_test.go /START7 OMIT/,/END7 OMIT/
 
-* おまけ
-
 * アサーション
 
 標準テストツールにアサーション機能は含まれていない。
@@ -247,5 +244,17 @@ testing.T#Helperメソッドを呼んでおくと結果出力のファイル名�
 - 自作ヘルパー関数
 - reflect.DeepEqual - sliceやmap、ポインタなどの参照先まで比較
 - google/go-comp - DeepEqualよりも高機能
-- ToQoz/gopwt - Go版Power Assert
+- ToQoz/gopwt - Go版Power Assert (~Go1.10、no Modules)
 
+* 今日話したこと
+
+- 基本的なテスト
+- ベンチマーク
+- Examples
+- 外部テストパッケージ
+- サブテスト
+- Table Driven Test
+- Property Based Test
+- TestMain
+- テストヘルパー
+- アサーション
