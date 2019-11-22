@@ -16,7 +16,7 @@ Knightso, LLC
 http://www.knightso.co.jp/
 Shizuoka, JAPAN
 
-.image ./images/hogecat.jpg 
+.image ./analysis/images/hogecat.jpg 
 
 * 静的解析とは
 
@@ -43,7 +43,7 @@ Shizuoka, JAPAN
 
 * 静的解析の流れ
 
-.image ./images/goanalysisflow2.png 530 _
+.image ./analysis/images/goanalysisflow2.png 530 _
 
 * goパッケージ
 
@@ -79,7 +79,7 @@ Shizuoka, JAPAN
 
 * やってみよう
 
-.code ./ast.go
+.code ./analysis/ast.go
 
 * analysisパッケージ
 

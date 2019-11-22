@@ -1,0 +1,251 @@
+Writing Tests in Go
+
+23 Nov 2019
+Tags: Go
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* Profile
+
+Daigo Ikeda
+@hogedigo
+
+Knightso, LLC
+http://www.knightso.co.jp/
+Shizuoka, JAPAN
+
+.image ./gotest/images/hogecat.jpg 
+
+* 要約
+
+- 基本的なテスト
+- ベンチマーク
+- Examples
+- 外部テストパッケージ
+- サブテスト
+- Table Driven Test
+- Property Based Test
+- TestMain
+- テストヘルパー
+- アサーション
+- モック
+
+* 基本的なテスト
+
+例）gotest/hello/hello.go
+
+.code ./gotest/src/gotest/hello/hello.go
+
+* 
+
+ファイル名に"_test.go"のサフィックスをつける。
+
+.image ./gotest/images/hello_test_ss.png 80 _
+
+テスト関数フォーマット
+
+ func TestXxx(*testing.T)
+
+* 
+
+testingパッケージ
+
+.link https://golang.org/pkg/testing/
+
+*** ログ出力
+
+- Log, Logf
+
+*** テストを失敗させる
+
+- Fail, FailNow
+- Error, Errorf
+- Fatal, Fatalf
+
+*** テストをスキップする
+
+- SkipNow, Skip, Skipf  
+
+* 
+
+gotest/hello/hello_test.go
+
+.code ./gotest/src/gotest/hello/hello_test.go /START1 OMIT/,/END1 OMIT/
+
+* go testコマンド
+
+コマンドはGo標準に含まれている。
+
+.link https://golang.org/pkg/cmd/go/internal/test/
+
+引数に何も指定しない場合はカレントディレクトリのテストを実行
+
+ $ go test
+
+引数を指定した場合はパッケージ実行
+
+ $ go test gotest/hello
+
+サブパッケージも再帰的に実行
+
+ $ go test ./...
+
+* go testオプション（抜粋）
+
+- -v : 詳細出力（つけないとテスト成功時は何も出力されない）
+- -run <regexp> : 実行テスト指定
+- -cpu : 実行時GOMAXPROCSをリスト指定（eg. 1,2,4）。デフォルトは環境のGOMAXPROCS。
+- -bench : ベンチマーク計測（後述）
+- -parallel : テストの同時実行数指定。デフォルトは環境のGOMAXPROCS。
+- -short : テスト実行時間短縮（後述）
+
+* 
+
+出力例（失敗）:
+
+ --- FAIL: TestHello (0.00s)
+     hello_test.go:11: Hello("Gopher") = Hello, Gopher!"; want "Hello, Gopher!!"
+ FAIL
+ exit status 1
+ FAIL	gotest/hello	0.005s
+
+出力例（成功）:
+
+ ok  	gotest/hello	0.006s
+
+* ベンチマーク
+
+.code ./gotest/src/gotest/hello/hello_test.go /START2 OMIT/,/END2 OMIT/
+
+go testコマンドに-benchオプションで実行する
+
+ go test -bench . ./...
+
+出力:
+
+ goos: darwin
+ goarch: amd64
+ pkg: gotest/hello
+ BenchmarkHello-8   	 9722349	       107 ns/op
+ PASS
+ ok  	gotest/hello	1.177s
+
+* 並列実行
+
+- t.Parallel() を呼び出す
+
+ func TestHello(t *testing.T) {
+ 	t.Parallel()
+ 
+ 	// test
+ }
+
+- go test -parallel
+- race conditionに注意
+
+* SkipとShort
+
+testing.T#Skipで、テストを途中でスキップすることができる
+testing.Shortは-shortオプション時にtrueを返す
+
+.code ./gotest/src/gotest/hello/hello_test.go /START4 OMIT/,/END4 OMIT/
+
+testing.Shortは-shortオプション時にtrueを返す
+
+.code ./gotest/src/gotest/hello/hello_test.go /START4 OMIT/,/END4 OMIT/
+* Examples
+
+標準出力をテストする
+
+.code ./gotest/src/gotest/hello/hello_test.go /START3 OMIT/,/END3 OMIT/
+
+- さらにgo docに使用例表示できる
+
+* 
+
+godoc
+
+.image ./gotest/images/hello_example_ss.png
+
+* 外部テストパッケージ
+
+.code ./gotest/src/gotest/hello/example_hello_test.go
+
+- 他のパッケージからの呼び出しとしてテストできる
+- 循環参照問題の解決
+- Exampleで使用することで使用例をそのままコピペ可能とする
+
+* 
+
+.image ./gotest/images/hello_ext_example_ss.png
+
+* サブテスト
+
+testing.T#Runで、テスト内でサブテストを実行できる
+
+ t.Run("name", func(t *testing.T) { ... })
+
+- -run TestXXX/subtest で指定実行できる
+- 複数のサブテストに対して共通の前処理・後処理を書くのに便利
+- 後述するTable Driven Testと組み合わせるとさらに便利
+
+* 
+.code ./gotest/src/gotest/hello/hello_test.go /START5 OMIT/,/END5 OMIT/
+
+* Table Driven Test
+
+.link https://github.com/golang/go/wiki/TableDrivenTests
+
+- テストデータ（入力値、期待値）を配列で準備して、ループして実行
+- サブテストを組み合わせると強力!
+
+* 
+
+.code ./gotest/src/gotest/hello/hello_test.go /START6 OMIT/,/END6 OMIT/
+
+* Property Based Test
+
+testing/quick
+
+.link https://golang.org/pkg/testing/quick/
+
+.code ./gotest/src/gotest/hello/hello_test.go /START8 OMIT/,/END8 OMIT/
+
+* TestMain
+
+パッケージ全体の前処理、後処理を記述することができる
+
+.code ./gotest/src/gotest/hello/main_test.go /START OMIT/,/END OMIT/
+
+* テストヘルパー
+
+テストヘルパー関数（*testing.Tを受け取る関数）を作成した際、
+testing.T#Helperメソッドを呼んでおくと結果出力のファイル名、行番号が調整される。
+
+.code ./gotest/src/gotest/hello/hello_test.go /START7 OMIT/,/END7 OMIT/
+
+* おまけ
+
+* アサーション
+
+標準テストツールにアサーション機能は含まれていない。
+
+.link https://golang.org/doc/faq#testing_framework
+
+意訳↓
+
+- 見た人がすぐわかるエラーメッセージを書こうね
+- テストフレームワークってミニ言語つくりがちだけど、Goで書けばいいじゃん
+- もしテストコードが膨らみがちな場合はTable Driven Testで解決できるかも？
+
+* 
+
+*とは言ってももう少し楽をしたい・・・*
+
+- 自作ヘルパー関数
+- reflect.DeepEqual - sliceやmap、ポインタなどの参照先まで比較
+- google/go-comp - DeepEqualよりも高機能
+- ToQoz/gopwt - Go版Power Assert
+

@@ -21,3 +21,4 @@ _testmain.go
 
 *.exe
 *.test
+content/2019/gotest/pkg

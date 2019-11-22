@@ -1,0 +1,164 @@
+実践！Go並行処理！
+
+20 Jul 2019
+Tags: GAE, Go
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* Profile
+
+Daigo Ikeda
+@hogedigo
+
+Knightso, LLC
+http://www.knightso.co.jp/
+Shizuoka, JAPAN
+
+.image ./concurrent_handson/images/hogecat.jpg 
+
+* 本発表の趣旨
+
+- Goのお手軽並行処理パターンを用途別に紹介する
+- 複雑なパターンは扱わない
+- ハマリポイントも紹介
+- ライブコーディング!
+- （時間が許せば）ハンズオン!
+
+* 流れ
+
+- お題説明
+- Try
+- 解答
+
+* Beforehand
+
+GorountieとChannelをおさらい
+
+.link http://goslides.knightso.co.jp/2014/goroutine_channel.slide#1
+
+* Let's start!
+
+* お題1： 外部IO
+
+- 外部サービスのAPIを複数呼び出す
+
+API呼び出し関数（モック）
+.code ./concurrent_handson/src/p1_multi_apicall_before.go /STARTAPI OMIT/,/ENDAPI OMIT/
+
+* 
+
+メイン処理
+.play ./concurrent_handson/src/p1_multi_apicall_before.go /START OMIT/,/END OMIT/
+
+* 
+
+Try!
+
+- 複数のAPI呼び出しをGoroutineで並行処理してみよう
+
+.link https://qiita.com/hogedigo/items/f0f409ee944c4b2107c3 参考
+
+Before:
+.link https://play.golang.org/p/oBCxbTdtpd3
+
+* 
+
+After 1： WaitGroupを利用した場合
+
+.link https://play.golang.org/p/hM9WAHy2p5U
+
+Adter 2： ErrGroupを利用した場合
+
+.link https://play.golang.org/p/90L_OdtsyTs
+
+* お題2： たくさん外部IO
+
+- 大量の外部API呼び出しを行う
+- 結果の順序は保持すること
+- 起きたエラーは全て確認できること
+
+API呼び出し関数（モック）
+.code ./concurrent_handson/src/p2_big_apicall_before.go /STARTAPI OMIT/,/ENDAPI OMIT/
+
+* 
+
+メイン処理
+.play ./concurrent_handson/src/p2_big_apicall_before.go /START OMIT/,/END OMIT/
+
+* 
+
+Try!
+
+- Goroutineで全てのAPIを並行処理してみよう
+
+Before:
+.link https://play.golang.org/p/XHvysED9D7s
+
+* 
+
+After： Channelを用いたFutureパターン
+
+.link https://play.golang.org/p/DFE-3WkYdS6
+
+* お題3: 同時実行数の抑制
+
+- 例えばそれぞれのgoroutineのメモリ使用量が大きいケース
+- 同時実行数をコントロールしたい
+
+メイン処理
+.play ./concurrent_handson/src/p3_semaphore_before.go /START OMIT/,/END OMIT/
+
+* 
+
+Try!
+
+- 同時実行数を10に制限しよう
+
+Before:
+.link https://play.golang.org/p/DFE-3WkYdS6
+
+* 
+
+After： バッファ付きchannelを使ったセマフォ
+
+.link https://play.golang.org/p/RC2ubR8IFmB
+
+参考
+.link https://godoc.org/golang.org/x/sync/semaphore
+
+* お題4: 巨大なデータの変換処理
+
+- リモートストレージ上のファイル(URLリスト)を1行ずつ読み込む
+- 各行URLのHTMLをフェッチしてスクレーピング
+- HTML内部に含まれるリンクURLをリストアップ
+- zip圧縮
+- リモートストレージに保存
+- 結果の順序は保証すること
+
+* 
+
+メイン処理
+.play ./concurrent_handson/src/p4_streamdata_before.go /START1 OMIT/,/END1 OMIT/
+
+* 
+
+.play ./concurrent_handson/src/p4_streamdata_before.go /START2 OMIT/,/END2 OMIT/
+
+* 
+
+Try!
+
+- URLフェッチを並行処理して処理速度をあげよう
+- メモリはできるだけ使わない様に（同時実行数制御）
+
+Before:
+.link https://play.golang.org/p/LO3egHJriR1
+
+* 
+
+After： 
+
+.link https://play.golang.org/p/rD_-2d_-lil
+
