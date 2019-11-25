@@ -1,0 +1,80 @@
+GopherJS
+
+23 Nov 2019
+Tags: Go
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* Profile
+
+Daigo Ikeda
+@hogedigo
+
+Knightso, LLC
+http://www.knightso.co.jp/
+Shizuoka, JAPAN
+
+.image ./gotest/images/hogecat.jpg 
+
+* Why GopherJS?
+
+先週のShizuoka.jsでShizuoka.goの告知をさせて貰った際の公約です(^ω^)
+
+.image ./gopherjs/images/shizuokajs.png 200 _
+
+* What's GopherJS?
+
+.link https://github.com/gopherjs/gopherjs
+
+所謂AltJS。
+Goで書かれたコードをJavaScriptに変換する。
+ブラウザ上で実行可能。
+
+* What's supported?
+
+.link https://github.com/gopherjs/gopherjs/blob/master/doc/packages.md
+
+- 基本的なパッケージは結構サポートされている
+- syscallやosなどもnode.jsではサポート
+- goroutineやchannelも使える！
+- GoからJSの関数にもアクセスできる
+
+* Bindings
+
+.link https://github.com/gopherjs/gopherjs/wiki/bindings
+
+ブラウザでJavascriptが動く！！＼(^o^)／
+.link https://github.com/hajimehoshi/otto-gopherjs
+
+* Usage
+
+ gopherjs build <package>
+
+- main関数が必要（JSエントリポイントになる）
+- 実行ディレクトリにjsファイルとmapファイルを出力
+
+- 1.13ではビルドエラー(´・ω・`)
+- Modules未対応(´・ω・`)
+
+* Try!!
+
+* Goal
+
+- Goの構造体や値型にビジネスルールを記述して隠蔽したい
+- ↑のビジネスルールをJSに変換してフロントでも透過的に呼び出したい
+
+* Go Code
+
+.image ./gopherjs/images/gopherjs-tree.png
+
+- gojstest/model/entity/ticket.go - 旅行チケット構造体
+- gojstest/model/vo/ticket_status.go - 旅行情報ステータス区分
+
+* Reference
+
+.link https://github.com/gopherjs/gopherjs
+
+.link https://qiita.com/hajimehoshi/items/bf16816e058f312386f0 GopherJS の基礎
+

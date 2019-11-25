@@ -87,7 +87,7 @@ gotest/hello/hello_test.go
 
  $ go test gotest/hello
 
-サブパッケージも再帰的に実行
+サブパッケージも再帰的に実行する場合
 
  $ go test ./...
 
@@ -97,7 +97,7 @@ gotest/hello/hello_test.go
 - -run <regexp> : 実行テスト指定
 - -cpu : 実行時GOMAXPROCSをリスト指定（eg. 1,2,4）。デフォルトは環境のGOMAXPROCS。
 - -bench : ベンチマーク計測（後述）
-- -parallel : テストの同時実行数指定。デフォルトは環境のGOMAXPROCS。
+- -parallel : テストの同時実行数指定（後述）。デフォルトは環境のGOMAXPROCS。
 - -short : テスト実行時間短縮（後述）
 
 * 
@@ -133,7 +133,7 @@ go testコマンドに-benchオプションで実行する
 
 * 並列実行
 
-- t.Parallel() を呼び出す
+- テスト関数内で t.Parallel() を呼び出す
 
  func TestHello(t *testing.T) {
  	t.Parallel()
@@ -147,7 +147,6 @@ go testコマンドに-benchオプションで実行する
 * SkipとShort
 
 testing.T#Skipで、テストを途中でスキップすることができる
-testing.Shortは-shortオプション時にtrueを返す
 
 .code ./gotest/src/gotest/hello/hello_test.go /START4 OMIT/,/END4 OMIT/
 
@@ -156,15 +155,27 @@ testing.Shortは-shortオプション時にtrueを返す
 .code ./gotest/src/gotest/hello/hello_test.go /START4 OMIT/,/END4 OMIT/
 * Examples
 
+テスト関数フォーマット
+
+ func ExampleXxx(*testing.T)
+
 標準出力をテストする
 
 .code ./gotest/src/gotest/hello/hello_test.go /START3 OMIT/,/END3 OMIT/
 
-- さらにgo docに使用例表示できる
+出力（失敗）
+
+ --- FAIL: ExampleHello (0.00s)
+ got:
+ Hello, Gopher!
+ want:
+ Hello, Gopher!!
+ FAIL
+ FAIL	gotest/hello	0.007s
 
 * 
 
-godoc
+さらにgo docに使用例表示できる
 
 .image ./gotest/images/hello_example_ss.png
 

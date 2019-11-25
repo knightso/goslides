@@ -43,7 +43,7 @@ func TestHelloShort(t *testing.T) {
 		t.Skip("skipped")
 	}
 
-	// 後続テスト
+	// 後続の時間のかかるテスト
 }
 
 // END4 OMIT
