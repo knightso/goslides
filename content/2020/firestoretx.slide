@@ -1,0 +1,974 @@
+GAE/Go & Firestore
+
+12 Sep 2020
+Tags: Go
+
+Daigo Ikeda
+Knightso, LLC
+@hogedigo
+
+* Profile
+
+Daigo Ikeda
+@hogedigo
+
+Knightso, LLC
+http://www.knightso.co.jp/
+Shizuoka, JAPAN
+
+.image ./firestoretx/images/hogecat.jpg 
+
+* 概要
+
+- GAE/Go
+- Cloud Firestore
+- Firestoreトランザクション（これがメイン）
+
+* GAE/Go
+
+* What is GAE?
+
+- Google App Engine
+- Google Cloud Platformの提供するPAAS
+- 負荷に応じて自動スケール
+- 従量課金。無料枠あり
+- Standard/Flexible Environment
+
+* GAE Standard Environment(SE)
+
+- Python, Java, Node.js, PHP, Ruby, Go
+- First/Second generation
+
+* GAE Second generation(2nd gen)
+
+- gVisor
+- 外部ネットワークアクセス
+- /tmp ディレクトリのファイル読み込み/書き込み
+- App Engine APIは使えない（Client Libraryや3rd party APIを利用）
+
+* GAE/Go(SE)
+
+- 1st gen - 1.11 （但しワケあり）
+- 2nd gen - 1.12+
+- 最新は1.14
+
+FYI:
+- [[https://qiita.com/apstndb/items/314e461aed518a4ad26f][GAE Go 1.11 ランタイムが公式には 2nd gen ではなくなった件について]]
+
+* Cloud Firestore
+
+* What is Firestore?
+
+- Native/Datastore mode
+- Native mode - 主にFirebase向け
+- Datastore modeは旧Datastoreの後継（本日扱うのはこちら）
+
+* 旧Datastoreおさらい
+
+.link /2014/gaego_introduction.slide
+
+手抜きスミマセン🙇🙇🙇
+
+* Firestore in Datastore mode
+
+- グローバルクエリが強整合に
+- トランザクション内でグローバルクエリ呼び出しOK
+- トランザクションの25エンティティグループ制限撤廃
+- 同一エンティティグループ書き込み 1/sec制限撤廃
+- 楽観的排他制御→悲観的ロック
+
+* Firestoreトランザクション
+
+* Firestoreトランザクションを試してみる
+
+- ローカルからDatastore Client Libraryを使用
+- 公式ドキュメントに書かれている内容に沿って検証
+
+.link https://cloud.google.com/datastore/docs/concepts/transactions
+
+* Atomic
+
+.link https://cloud.google.com/datastore/docs/concepts/transactions
+
+> Each transaction is guaranteed to be atomic, meaning that transactions are never partially applied. Either all of the operations in the transaction are applied, or none of them are applied.
+
+- トランザクション内のデータ更新は、必ず全てが成功するか、全てが失敗する
+
+* Atomic - OK
+
+.link ./firestoretx/src/fstx/atomic/main.go
+
+- トランザクション内でエンティティを２つ登録
+
+* 
+
+*実行結果*
+
+.image ./firestoretx/images/atomic_ok.png
+
+* Atomic - Rollback
+
+.link ./firestoretx/src/fstx/rollback/main.go
+
+- OKと同じ処理
+- コミット前にわざとエラーを返す
+
+* 
+
+*実行結果*
+
+ 2020/08/21 04:04:46 わざとエラー
+ exit status 1
+
+.image ./firestoretx/images/rollback.png 300 _
+
+* 500エンティティPut
+
+> Transactions can query or lookup any number of entities. You can create, update, or delete up to 500 entities in each transaction.
+
+- 登録・更新・削除は1トランザクション内で500まで
+
+* 500エンティティPut - OK
+
+.link ./firestoretx/src/fstx/maxentities/main.go
+
+* 
+
+*実行結果*
+
+.image ./firestoretx/images/max_ok.png 400 _
+
+* 501エンティティPut - NG
+
+- 前回コードを修正して実行
+
+ for i := 0; i < 501; i++ {
+
+* 
+
+*実行結果*
+
+ 2020/08/22 14:29:17 rpc error: code = InvalidArgument desc = cannot write more than 500 entities
+ in a single call
+ exit status 1
+
+- GAE/Go 1st genでappengine/datastoreパッケージだとこの制限はない
+
+* グローバルクエリ
+
+.link Queries in transactions are no longer required to be ancestor queries.
+
+> Queries in transactions are no longer required to be ancestor queries.
+
+- トランザクション内でグローバルクエリ（非祖先クエリ）を実行可能
+
+* グローバルクエリ- OK
+
+.link ./firestoretx/src/fstx/query/main.go
+
+* 
+
+*実行結果*
+
+ done. total:500
+
+* Locks
+
+* Locks
+
+.link https://cloud.google.com/datastore/docs/concepts/transactions#transaction_locks
+
+> Read-write transactions use reader/writer locks to enforce isolation and serializability. When two concurrent read-write transactions read or write the same data, the lock held by one transaction can delay the other transaction.
+
+- ２つのトランザクションが同時に同じデータをreadまたはwriteした場合、片方がロックを取得しもう片方がそれを待機する
+- （参考）旧Datastoreでは楽観的排他
+
+* 
+
+検証コード（各ケース共通）
+
+.link ./firestoretx/src/fstx/locks/main.go
+
+* Locks - Get vs Get
+
+- 単純なGetを並列で実行（必要なエンティティは予めPutしておく）
+- 最初に実行するプロセス（プロセス1）でコミット前にsleep
+- 後から実行するプロセス（プロセス2）は即コミットします。
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s Get
+ 2020/09/12 15:20:43 start
+ 2020/09/12 15:20:44 getting...
+ 2020/09/12 15:20:44 got {Value:1 CreatedAt:2020-09-10 14:19:37.872402 +0900 JST}
+ 2020/09/12 15:20:44 sleeping... 20s
+ 2020/09/12 15:21:04 commiting...
+ 2020/09/12 15:21:04 done.
+
+プロセス2
+
+ $ ./locks Get
+ 2020/09/12 15:20:47 start
+ 2020/09/12 15:20:48 getting...
+ 2020/09/12 15:20:48 got {Value:1 CreatedAt:2020-09-10 14:19:37.872402 +0900 JST}
+ 2020/09/12 15:20:48 sleeping... 0s
+ 2020/09/12 15:20:48 commiting...
+ 2020/09/12 15:20:48 done.
+
+* 
+
+- ロックはかからない
+- プロセス2にsleepを入れて後からコミットする様にしても同様
+
+* Locks - Get vs Put
+
+- プロセス1はGetしてsleep
+- プロセス2でPut、即コミット
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s Get
+ 2020/09/12 16:17:38 start
+ 2020/09/12 16:17:38 getting...
+ 2020/09/12 16:17:38 got {Value:1 CreatedAt:2020-09-10 14:19:37.872402 +0900 JST}
+ 2020/09/12 16:17:38 sleeping... 20s
+ 2020/09/12 16:17:58 commiting...
+ 2020/09/12 16:17:58 done.
+
+プロセス2
+
+ $ ./locks Put
+ 2020/09/12 16:17:43 start
+ 2020/09/12 16:17:43 putting...
+ 2020/09/12 16:17:43 sleeping... 0s
+ 2020/09/12 16:17:43 commiting...
+ 2020/09/12 16:17:58 done.
+
+* 
+
+- プロセス2（Put）のコミットでロック待機
+- どちらも正常終了
+
+ちなみに・・
+
+- 旧Datastoreの場合はロック待機なしで正常終了
+
+* Locks - Put vs Get
+
+- プロセス1はPutしてsleep
+- プロセス2でGet、即コミット
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s Put
+ 2020/09/12 16:26:54 start
+ 2020/09/12 16:26:55 putting...
+ 2020/09/12 16:26:55 sleeping... 20s
+ 2020/09/12 16:27:15 commiting...
+ 2020/09/12 16:27:15 done.
+
+プロセス2
+
+ $ ./locks Get
+ 2020/09/12 16:26:59 start
+ 2020/09/12 16:27:00 getting...
+ 2020/09/12 16:27:00 got {Value:1 CreatedAt:2020-09-10 16:24:57.462099 +0900 JST}
+ 2020/09/12 16:27:00 sleeping... 0s
+ 2020/09/12 16:27:00 commiting...
+ 2020/09/12 16:27:00 done.
+
+* 
+
+- ロック待機なし
+- どちらも正常終了
+
+* Locks - Put vs Get（その２）
+
+- プロセス1はPutしてsleep
+- プロセス2でGet、こちらもsleep
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s Put
+ 2020/09/12 05:09:08 start
+ 2020/09/12 05:09:09 putting...
+ 2020/09/12 05:09:09 sleeping... 20s
+ 2020/09/12 05:09:29 commiting...
+ 2020/09/12 05:09:36 done.
+
+プロセス2
+
+ $ ./locks -s 20s Get
+ 2020/09/12 05:09:15 start
+ 2020/09/12 05:09:16 getting...
+ 2020/09/12 05:09:16 got {Value:1 CreatedAt:2020-09-11 05:03:01.615712 +0900 JST}
+ 2020/09/12 05:09:16 sleeping... 20s
+ 2020/09/12 05:09:36 commiting...
+ 2020/09/12 05:09:36 done.
+
+* 
+
+- プロセス1がプロセス2（Get）のコミットまでロック待機
+- どちらも正常終了
+
+* Locks - Put vs Put
+
+- プロセス1はPutしてsleep
+- プロセス2でPut、即コミット
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s Put
+ 2020/09/12 03:21:30 start
+ 2020/09/12 03:21:31 putting...
+ 2020/09/12 03:21:31 sleeping... 20s
+ 2020/09/12 03:21:51 commiting...
+ 2020/09/12 03:21:51 done.
+
+プロセス2
+
+ $ ./locks Put
+ 2020/09/12 03:21:35 start
+ 2020/09/12 03:21:36 putting...
+ 2020/09/12 03:21:36 sleeping... 0s
+ 2020/09/12 03:21:36 commiting...
+ 2020/09/12 03:21:36 done.
+
+* 
+
+- ロック待機なし！！😳
+- どちらも正常終了
+
+* Locks - Get&Put vs Get
+
+- プロセス1ではエンティティを一度GetしたのちPutしてsleep
+- プロセス2でGet、即コミット
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s GetPut
+ 2020/09/12 04:14:49 start
+ 2020/09/12 04:14:49 getting...
+ 2020/09/12 04:14:49 got {Value:1 CreatedAt:2020-09-11 04:00:30.603741 +0900 JST}
+ 2020/09/12 04:14:49 putting...
+ 2020/09/12 04:14:49 sleeping... 20s
+ 2020/09/12 04:15:09 commiting...
+ 2020/09/12 04:15:10 done.
+
+プロセス2
+
+ $ ./locks Get
+ 2020/09/12 04:14:52 start
+ 2020/09/12 04:14:53 getting...
+ 2020/09/12 04:14:53 got {Value:1 CreatedAt:2020-09-11 04:00:30.603741 +0900 JST}
+ 2020/09/12 04:14:53 sleeping... 0s
+ 2020/09/12 04:14:53 commiting...
+ 2020/09/12 04:14:53 done.
+
+* 
+
+- ロック待機なし
+- どちらも正常終了
+
+* Locks - Get vs Get&Put
+
+- プロセス1ではエンティティをGetしてsleep
+- プロセス2はその間にGet＆Putして即コミット
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s Get
+ 2020/09/12 04:18:39 start
+ 2020/09/12 04:18:40 getting...
+ 2020/09/12 04:18:40 got {Value:1 CreatedAt:2020-09-11 04:18:10.5811 +0900 JST}
+ 2020/09/12 04:18:40 sleeping... 20s
+ 2020/09/12 04:19:00 commiting...
+ 2020/09/12 04:19:00 done.
+
+プロセス2
+
+ $ ./locks GetPut
+ 2020/09/12 04:18:45 start
+ 2020/09/12 04:18:45 getting...
+ 2020/09/12 04:18:45 got {Value:1 CreatedAt:2020-09-11 04:18:10.5811 +0900 JST}
+ 2020/09/12 04:18:45 putting...
+ 2020/09/12 04:18:45 sleeping... 0s
+ 2020/09/12 04:18:45 commiting...
+ 2020/09/12 04:19:00 done.
+
+* 
+
+- プロセス2がロック待機
+- どちらも正常終了
+
+* Locks - Get&Put vs Put
+
+- プロセス1ではエンティティをGet&Putしてsleep
+- プロセス2はその間にPutして即コミット
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s GetPut
+ 2020/09/12 04:21:44 start
+ 2020/09/12 04:21:44 getting...
+ 2020/09/12 04:21:44 got {Value:1 CreatedAt:2020-09-11 04:18:45.825498 +0900 JST}
+ 2020/09/12 04:21:44 putting...
+ 2020/09/12 04:21:44 sleeping... 20s
+ 2020/09/12 04:22:04 commiting...
+ 2020/09/12 04:22:05 done.
+
+プロセス2
+
+ $ ./locks Put
+ 2020/09/12 04:21:49 start
+ 2020/09/12 04:21:50 putting...
+ 2020/09/12 04:21:50 sleeping... 0s
+ 2020/09/12 04:21:50 commiting...
+ 2020/09/12 04:22:05 done.
+
+* 
+
+- プロセス2がロック待機
+- どちらも正常終了
+
+* Locks - Put vs Get&Put
+
+- プロセス1ではエンティティをPutしてsleep
+- プロセス2はその間にGet＆Putして即コミット
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s Put
+ 2020/09/12 04:32:43 start
+ 2020/09/12 04:32:44 putting...
+ 2020/09/12 04:32:44 sleeping... 20s
+ 2020/09/12 04:33:04 commiting...
+ 2020/09/12 04:33:04 done.
+
+プロセス2
+
+ $ ./locks GetPut
+ 2020/09/12 04:32:48 start
+ 2020/09/12 04:32:48 getting...
+ 2020/09/12 04:32:48 got {Value:1 CreatedAt:2020-09-11 04:31:50.387902 +0900 JST}
+ 2020/09/12 04:32:48 putting...
+ 2020/09/12 04:32:48 sleeping... 0s
+ 2020/09/12 04:32:48 commiting...
+ 2020/09/12 04:32:48 done.
+
+* 
+
+- ロック待機なし
+- どちらも正常終了
+
+* Locks - Put vs Get&Put（その２）
+
+- プロセス1ではエンティティをPutしてsleep
+- プロセス2はGet＆Putしてこちらもsleep。さらに書き込む値も変更
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s -v 2 Put
+ 2020/09/12 04:41:10 start
+ 2020/09/12 04:41:11 putting...
+ 2020/09/12 04:41:11 sleeping... 20s
+ 2020/09/12 04:41:31 commiting...
+ 2020/09/12 04:41:36 done.
+
+プロセス2
+
+ $ ./locks -s 20s -v 3 GetPut
+ 2020/09/12 04:41:16 start
+ 2020/09/12 04:41:16 getting...
+ 2020/09/12 04:41:16 got {Value:1 CreatedAt:2020-09-11 04:41:05.819933 +0900 JST}
+ 2020/09/12 04:41:16 putting...
+ 2020/09/12 04:41:16 sleeping... 20s
+ 2020/09/12 04:41:36 commiting...
+ 2020/09/12 04:41:36 done.
+
+* 
+
+- プロセス1がプロセス2のコミットまでロック待機
+- どちらも正常終了
+- 最終的に保存された値はプロセス1の書き込んだValue=2
+
+
+ちなみに旧Datastoreだと・・
+
+- ロック待機なし
+- プロセス1は即成功終了
+- プロセス2はconcurrent transactionエラー
+
+* Locks - Get&Put vs Get&Put
+
+- プロセス1ではエンティティをGet&Putしてsleep
+- プロセス2もGet＆Putして即コミット
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s GetPut
+ 2020/09/12 09:14:44 start
+ 2020/09/12 09:14:45 getting...
+ 2020/09/12 09:14:45 got {Value:1 CreatedAt:2020-09-11 08:43:20.957081 +0900 JST}
+ 2020/09/12 09:14:45 putting...
+ 2020/09/12 09:14:45 sleeping... 20s
+ 2020/09/12 09:15:05 commiting...
+ 2020/09/12 09:15:05 done.
+
+プロセス2
+
+ $ ./locks GetPut
+ 2020/09/12 09:14:50 start
+ 2020/09/12 09:14:50 getting...
+ 2020/09/12 09:14:50 got {Value:1 CreatedAt:2020-09-11 08:43:20.957081 +0900 JST}
+ 2020/09/12 09:14:50 putting...
+ 2020/09/12 09:14:50 sleeping... 0s
+ 2020/09/12 09:14:50 commiting...
+ 2020/09/12 09:15:05 datastore: concurrent transaction
+
+* 
+
+- プロセス1は正常終了
+- プロセス2はプロセス1のコミット完了までロックし、concurrent transactionエラー
+
+
+ちなみに旧Datastoreだと・・
+
+- ロック待機なし
+- プロセス1は即時正常終了
+- プロセス2がconcurrent transactionエラー
+
+* Locks - Mutation:  Get、 Update、（エンティティが存在している状態での）Upsert
+
+- Get、Putと同じ組み合わせを検証して同じ挙動
+
+* Locks - Mutation: Insert vs Insert
+
+- エンティティが存在しない状態
+- プロセス1, 2両方からInsert
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s Insert
+ 2020/09/12 09:36:43 start
+ 2020/09/12 09:36:44 inserting...
+ 2020/09/12 09:36:44 sleeping... 20s
+ 2020/09/12 09:37:04 commiting...
+ 2020/09/12 09:37:04 rpc error: code = AlreadyExists desc = entity already exists: app: "b~kni-fs-tx-test"
+ path <
+   Element {
+     type: "Sample"
+     name: "test"
+   }
+ >
+
+* 
+
+プロセス2
+
+ $ ./locks Insert
+ 2020/09/12 09:36:48 start
+ 2020/09/12 09:36:49 inserting...
+ 2020/09/12 09:36:49 sleeping... 0s
+ 2020/09/12 09:36:49 commiting...
+ 2020/09/12 09:36:49 done.
+
+- プロセス2は即時正常終了
+- プロセス1はコミット時にAlreadyExistsというエラー
+- プロセス2にsleepを設定すると、今度はプロセス2がAlreadyExistsエラーに（コミット先勝ち?）
+
+* Locks - Query & Put
+
+- 予めKey名がA, B, Cのエンティティを用意
+- プロセス1が A <= key <= C でクエリを実行し、10秒sleep
+- プロセス2が後からKey名AAでエンティティをPut
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks/locks -sa 10s Query
+ 2020/09/12 17:10:47 start
+ 2020/09/12 17:10:47 sleeping... 0s
+ 2020/09/12 17:10:47 querying...
+ 2020/09/12 17:10:48 0: &{Value:1 UpdatedAt:2020-09-11 16:22:50.11876 +0900 JST}
+ 2020/09/12 17:10:48 1: &{Value:2 UpdatedAt:2020-09-11 16:22:59.032873 +0900 JST}
+ 2020/09/12 17:10:48 2: &{Value:3 UpdatedAt:2020-09-11 16:23:08.504272 +0900 JST}
+ 2020/09/12 17:10:48 sleeping... 10s
+ 2020/09/12 17:10:58 committing...
+ 2020/09/12 17:10:58 done.
+
+プロセス2
+
+ $ ./locks/locks -k AA Put
+ 2020/09/12 16:55:26 start
+ 2020/09/12 16:55:27 sleeping... 0s
+ 2020/09/12 16:55:27 putting...
+ 2020/09/12 16:55:27 sleeping... 0s
+ 2020/09/12 16:55:27 committing...
+ 2020/09/12 16:55:42 done.
+
+* 
+
+- プロセス2はロック待機（インデックスレンジロック?）
+- どちらも正常終了
+
+* Locks - まとめ
+
+- Getがロックを取得し、Putはロック待機する
+- Put同士だとロック待機は発生しない
+- ロック待機はPut操作時ではなくコミット時に発生
+- クエリは範囲に対してロックがかかる（?）
+
+* Isolation and consistency
+
+* Isolation and consistency
+
+.link https://cloud.google.com/datastore/docs/concepts/transactions#isolation_and_consistency
+
+> Datastore mode databases enforce serializable isolation. Data read or modified by a transaction cannot be concurrently modified.
+
+- 分離レベルはSERIALIZABLE
+
+* Isolation and consistency - Put vs Get
+
+- 予めValueプロパティの値を1にしておく
+- プロセス1は値を書き換えてPutを行い20秒間sleep
+- プロセス2がGetして即時終了
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -s 20s -v 2 Put
+ 2020/09/12 14:50:31 start
+ 2020/09/12 14:50:32 putting...
+ 2020/09/12 14:50:32 sleeping... 20s
+ 2020/09/12 14:50:52 commiting...
+ 2020/09/12 14:50:52 done.
+
+プロセス2
+
+ $ ./locks Get
+ 2020/09/12 14:50:36 start
+ 2020/09/12 14:50:36 getting...
+ 2020/09/12 14:50:36 got {Value:1 CreatedAt:2020-09-11 14:50:14.517059 +0900 JST}
+ 2020/09/12 14:50:36 sleeping... 0s
+ 2020/09/12 14:50:36 commiting...
+ 2020/09/12 14:50:36 done.
+
+* 
+
+- プロセス2は、プロセス1のPutした値ではなく、更新前の値を取得
+- 事前に対象エンティティを削除しておいた場合、プロセス2はno such entityエラーで終了する
+
+* Isolation and consistency - 遅延Get Vs Put
+
+ドキュメント下記を検証
+
+> Queries and lookups in a transaction see a consistent snapshot of the state of the database. This snapshot is guaranteed to contain the effect of all transactions and writes that completed prior to the beginning of the transaction.
+
+- 予めValueプロパティの値を1に
+- 今まではエンティティ操作後にsleepしていましたが、今回プロセス1はまずsleepしてからGet
+- プロセス1のsleep中にプロセス2はPut
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./locks -sb 10s Get
+ 2020/09/12 15:33:01 start
+ 2020/09/12 15:33:02 sleeping... 10s
+ 2020/09/12 15:33:12 getting...
+ 2020/09/12 15:33:12 got {Value:99 CreatedAt:2020-09-11 15:33:06.947901 +0900 JST}
+ 2020/09/12 15:33:12 sleeping... 0s
+ 2020/09/12 15:33:12 commiting...
+ 2020/09/12 15:33:12 done.
+
+プロセス2
+
+ $ ./locks -v 99 Put
+ 2020/09/12 15:33:06 start
+ 2020/09/12 15:33:06 sleeping... 0s
+ 2020/09/12 15:33:06 putting...
+ 2020/09/12 15:33:06 sleeping... 0s
+ 2020/09/12 15:33:06 commiting...
+ 2020/09/12 15:33:07 done.
+
+* 
+
+- プロセス1のGetでプロセス2のPutした値が取得されました
+- トランザクション開始時ではなくGet時点のスナップショットを参照（？）
+
+* Isolation and consistency - 連続 Get vs PutMulti
+
+1. プロセス1がトランザクション開始
+2. プロセス2がエンティティA, B, CをPutMulti
+3. プロセス1がエンティティAを取得
+4. プロセス3がエンティティB, CをPutMulti
+5. プロセス1がエンティティBを取得
+6. プロセス4がエンティティCをPutMulti
+7. プロセス1がエンティティBを取得
+
+* 
+
+*実行結果*
+
+プロセス1
+
+ $ ./getabc
+ 2020/09/12 16:22:46 sleeping... 10s
+ 2020/09/12 16:22:56 key:/Sample,A, value:{Value:1 UpdatedAt:2020-09-11 16:22:50.11876 +0900 JST}
+ 2020/09/12 16:22:56 sleeping... 10s
+ 2020/09/12 16:23:06 key:/Sample,B, value:{Value:2 UpdatedAt:2020-09-11 16:22:59.032873 +0900 JST}
+ 2020/09/12 16:23:06 sleeping... 10s
+ 2020/09/12 16:23:16 key:/Sample,C, value:{Value:3 UpdatedAt:2020-09-11 16:23:08.504272 +0900 JST}
+ done
+
+プロセス2,3,4
+
+ $ ./putabc -v 1 A B C
+ 2020/09/12 16:22:50 putting value:1 into entities [A B C]
+ done
+ $ ./putabc -v 2 B C
+ 2020/09/12 16:22:59 putting value:2 into entities [B C]
+ done
+ $ ./putabc -v 3 C
+ 2020/09/12 16:23:08 putting value:3 into entities [C]
+ done
+
+* 
+
+- やはりGet時点のスナップショットを参照
+
+* Isolation and consistency - Get&Put&Get
+
+ドキュメント下記を検証
+
+> Unlike with most databases, queries and lookups inside a Datastore mode transaction do not see the results of previous writes inside that transaction. 
+
+- １トランザクション内でGet、Put、Get
+
+* 
+
+*実行結果*
+
+ $ ./getputget
+ 2020/09/12 04:09:49 got before put: {Value:1 UpdatedAt:2020-09-12 04:09:38.084512 +0900 JST}
+ 2020/09/12 04:09:49 got after put: {Value:1 UpdatedAt:2020-09-12 04:09:38.084512 +0900 JST}
+ done
+ % ./getputget
+ 2020/09/12 04:09:57 got before put: {Value:2 UpdatedAt:2020-09-12 04:09:49.166701 +0900 JST}
+ 2020/09/12 04:09:57 got after put: {Value:2 UpdatedAt:2020-09-12 04:09:49.166701 +0900 JST}
+ done
+
+* 
+
+- トランザクション内でPutしたエンティティを再度Getしても、Putした内容は参照されない
+- 旧Datastoreでも同様
+
+* Read-only Transaction
+
+* Read-only Transaction
+
+TODO 🙇🙇🙇
+
+* トランザクション処理のハマりどころ
+
+* RunInTransactionは冪等に
+
+- RunInTransactionは競合エラーでリトライされる為、処理を冪等にしておく必要がある
+- またはMaxAttemptsオプションを1にすることでリトライを抑制可能
+
+
+例えば・・
+
+.link ./firestoretx/src/fstx/query/main.go
+
+* トランザクション貼り忘れに注意
+
+.link ./firestoretx/src/fstx/notxput/main.go
+
+.code ./firestoretx/src/fstx/notxput/main.go /START OMIT/,/END OMIT/
+
+* 
+
+*実行結果*
+
+ % ./notxput
+ 2020/09/12 04:23:08 start
+ 2020/09/12 04:23:28 rpc error: code = Aborted desc = too much contention on these datastore entities. please try again.
+
+* トランザクション内での強制終了を極力避ける
+
+.link ./firestoretx/src/fstx/panicc/main.go
+
+.code ./firestoretx/src/fstx/panicc/main.go /START OMIT/,/END OMIT/
+
+- 一定時間ロックの開放が行われません。
+
+> Transactions expire after 270 seconds or if idle for 60 seconds.
+
+* （おまけ）Transactional Cloud Tasks
+
+* Cloud Tasks をトランザションに含めたい
+
+- App Engine API（appengine/datastoreパッケージ）ではDatastoreトランザクションにTask QueueのAddを追加することが出来た
+- Datastore Client LibraryはCloud Tasksと連携できない(´･ω･`)
+
+* 作戦
+
+- トランザクション内で一意なIDをふったステータスを保存
+- IDとタイムスタンプをCloud Tasksリクエストヘッダに設定
+- ハンドラはステータスの存在を確認したら処理を開始。確認できなかったらリトライ
+- 一定時間リトライしてもステータスが見つからなかったらロールバックとみなして終了
+
+* RunInTransactionラッパー関数
+
+ func RunInTransactionWithTasks(ctx context.Context, f func(ctx context.Context, tx *datastore.Transaction) error, opts ...datastore.TransactionOption) error {
+ 	wrapperFunc := func(tx *datastore.Transaction) error {
+ 		txid := id.NewUUIDv4()
+ 
+ 		ctx, cancel := context.WithTimeout(ctx, 30 * time.Second)
+ 		defer cancel()
+ 
+ 		txStatus := &TxStatus{
+ 			ID:        txid,
+ 			CreatedAt: timeutil.NowJST(),
+ 		}
+ 
+ 		if err := c.MutateInTx(tx, datastore.NewInsert(Key(txStatus), txStatus)); err != nil {
+ 			return xerrors.Errorf(": %w", err)
+ 		}
+ （つづく）
+
+* 
+ 
+ （つづき）
+ 		ctx = WithStatus(ctx, txStatus)
+ 		return f(ctx, tx)
+ 	}
+ 
+ 	if _, err := client.RunInTransaction(ctx, wrapperFunc, opts...); err != nil {
+ 		return xerrors.Errorf(": %w", err)
+ 	}
+ 
+ 	return nil
+ }
+
+* Task Add 
+
+ headers := make(map[string]string)
+ 
+ status := libtx.Status(ctx)
+ if status != nil {
+ 	headers[TaskTxIDHeaderName] = status.ID
+ 	headers[TaskTxDispatchTimeHeaderName] = status.CreatedAt.Format(time.RFC3339Nano)
+ }
+ 
+ task := &taskspb.Task{
+ 	MessageType: &taskspb.Task_AppEngineHttpRequest{
+ 		AppEngineHttpRequest: &taskspb.AppEngineHttpRequest{
+ 			HttpMethod:  taskspb.HttpMethod_POST,
+ 			RelativeUri: relativeUri,
+ 			Body:        body,
+ 			Headers:     headers,
+ 			AppEngineRouting: &taskspb.AppEngineRouting{
+ 				Service: service,
+ 				Version: version,
+ 			},
+ 		},
+ 	},
+ }
+ （つづく）
+
+* 
+
+ （つづき）
+ req := &taskspb.CreateTaskRequest{
+ 	Parent: queuePath,
+ 	Task:   task,
+ }
+ 
+ if _, err := client.CreateTask(ctx, req); err != nil {
+ 	return xerrors.Errorf(": %w", err)
+ }
+
+* Tasksハンドラ
+
+ txID := r.Header.Get(tasksutil.TaskTxIDHeaderName)
+ 
+ if txID != "" {
+ 	dispatchTime, err := time.Parse(time.RFC3339Nano, r.Header.Get(tasksutil.TaskTxDispatchTimeHeaderName))
+ 	if err != nil {
+ 		w.WriteHeader(http.StatusBadRequest)
+ 		return
+ 	}
+
+ 	txStatus := &libtx.TxStatus{ID: txID}
+ 	if err := client.Get(ctx, txStatus); xerrors.Is(err, domerr.ErrNotFound) {
+ 		if time.Now().Sub(dispatchTime) > tx.TxTimeout*2 { // トランザクションタイムアウトの2倍超えたらタイムアウト
+ 			return
+ 		} else {
+ 			w.WriteHeader(http.StatusLocked)
+ 			return
+ 		}
+ 	} else if err != nil {
+ 		w.WriteHeader(http.StatusInternalServerError)
+ 		return
+ 	}
+ }
